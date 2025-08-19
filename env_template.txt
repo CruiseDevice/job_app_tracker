@@ -1,0 +1,4 @@
+# Email credentials for job application monitoring
+# Copy these variables to your .env file:
+EMAIL_ADDRESS=your_email@example.com
+EMAIL_PASSWORD=your_app_password
