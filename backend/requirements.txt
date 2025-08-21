@@ -1,6 +1,12 @@
-python-dotenv==1.0.0
-uvicorn
+python-dotenv==1.0.1
+uvicorn[standard]
 fastapi
 sqlalchemy
 pydantic
 pydantic-settings
+websockets
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+openai

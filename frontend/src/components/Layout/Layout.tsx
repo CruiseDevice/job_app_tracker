@@ -1,7 +1,10 @@
-import clsx from "clsx";
+// FILE: frontend/src/components/Layout/Layout.tsx
+
+import React from 'react';
+import clsx from 'clsx';
 import { useAppSelector } from '../../hooks/useAppSelector';
-import { Circle } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Circle, FileText, Home, Settings } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,9 +14,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { is_monitoring } = useAppSelector((state) => state.monitor); 
   const location = useLocation();
   const navigation = [
-    {name: 'Dashboard', href:'/', icon: 'Home'},
-    {name: 'Applications', href:'/applications', icon: 'FileText'},
-    {name: 'Settings', href:'/settings', icon: 'Settings'},
+    {name: 'Dashboard', href:'/', icon: Home},
+    {name: 'Applications', href:'/applications', icon: FileText},
+    {name: 'Settings', href:'/settings', icon: Settings},
   ];
 
   return (
@@ -60,7 +63,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       }
                     )}
                     >
-                    <Icon />
+                    <Icon className="w-5 h-5 mr-3" />
                     {item.name}
                     </Link>
                   </li>

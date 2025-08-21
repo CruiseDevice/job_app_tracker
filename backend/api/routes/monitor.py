@@ -1,25 +1,29 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
-
-# global monitoring state (in a real app, this would be more sophisticated)
+# Global monitoring state (in a real app, this would be more sophisticated)
 monitoring_state = {"is_monitoring": False}
 
-
 @router.get("/status")
-async def get_monitor_status():
-    """Get monitoring status"""
-    return {"message": "Monitor endpoint - not yet implemented"}
+async def get_monitoring_status():
+    """Get current monitoring status"""
+    return monitoring_state
 
-
-@router.get("/start")
+@router.post("/start")
 async def start_monitoring():
     """Start email monitoring"""
-    return {"message": "Start email monitoring - not yet implemented"}
-
+    try:
+        monitoring_state["is_monitoring"] = True
+        return {"message": "Monitoring started", "status": monitoring_state}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting monitoring: {str(e)}")
 
 @router.post("/stop")
 async def stop_monitoring():
     """Stop email monitoring"""
-    return {"message": "Stop email monitoring - not yet implemented"}
+    try:
+        monitoring_state["is_monitoring"] = False
+        return {"message": "Monitoring stopped", "status": monitoring_state}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error stopping monitoring: {str(e)}")

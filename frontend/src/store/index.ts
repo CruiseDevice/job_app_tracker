@@ -1,10 +1,22 @@
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore } from '@reduxjs/toolkit';
+import applicationsSlice from './slices/applicationsSlice';
+import statisticsSlice from './slices/statisticsSlice';
+import settingsSlice from './slices/settingsSlice';
 import monitorSlice from './slices/monitorSlice';
 
 export const store = configureStore({
   reducer: {
-    monitor: monitorSlice
-  }
+    applications: applicationsSlice,
+    statistics: statisticsSlice,
+    settings: settingsSlice,
+    monitor: monitorSlice,
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: ['persist/PERSIST'],
+      },
+    }),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
