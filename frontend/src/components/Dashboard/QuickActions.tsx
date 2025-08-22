@@ -6,7 +6,7 @@ import { useAppDispatch } from '../../hooks/useAppDispatch';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { fetchApplications } from '../../store/slices/applicationsSlice';
 import { fetchStatistics } from '../../store/slices/statisticsSlice';
-import { monitorApi } from '../../services/monitor';
+import { startMonitoring, stopMonitoring } from '../../store/slices/monitorSlice';
 
 const QuickActions: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -18,11 +18,10 @@ const QuickActions: React.FC = () => {
     setIsToggling(true);
     try {
       if (is_monitoring) {
-        await monitorApi.stopMonitoring();
+        await dispatch(stopMonitoring()).unwrap();
       } else {
-        await monitorApi.startMonitoring();
+        await dispatch(startMonitoring()).unwrap();
       }
-      // The monitoring status will be updated via WebSocket
     } catch (error) {
       console.error('Error toggling monitoring:', error);
       // TODO: Show error toast
