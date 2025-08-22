@@ -35,14 +35,17 @@ export interface JobApplication {
   }
   
   export interface ApplicationStats {
-    total: number;
-    today: number;
-    thisWeek: number;
-    thisMonth: number;
-    byStatus: Record<ApplicationStatus, number>;
-    interviewRate: number;
-    responseRate: number;
-  }
+  total: number;
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  avgPerDay: number;
+  topCompanies: Array<{ company: string; count: number }>;
+  statusDistribution: Record<string, number>;
+  byStatus: Record<ApplicationStatus, number>;
+  interviewRate: number;
+  responseRate: number;
+}
   
   export interface CreateApplicationRequest {
     company: string;

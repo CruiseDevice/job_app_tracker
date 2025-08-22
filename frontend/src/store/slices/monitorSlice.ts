@@ -5,12 +5,14 @@ import { monitorApi } from '../../services/monitor';
 interface MonitorState extends MonitorStatus {
   loading: boolean;
   error: string | null;
+  isConnected: boolean;
 }
 
 const initialState: MonitorState = {
   is_monitoring: false,
   loading: false,
   error: null,
+  isConnected: false,
 };
 
 export const fetchMonitorStatus = createAsyncThunk(
@@ -43,6 +45,9 @@ const monitorSlice = createSlice({
     setMonitoringStatus: (state, action) => {
       state.is_monitoring = action.payload;
     },
+    setConnectionStatus: (state, action) => {
+      state.isConnected = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -58,5 +63,5 @@ const monitorSlice = createSlice({
   },
 });
 
-export const { setMonitoringStatus } = monitorSlice.actions;
+export const { setMonitoringStatus, setConnectionStatus } = monitorSlice.actions;
 export default monitorSlice.reducer;

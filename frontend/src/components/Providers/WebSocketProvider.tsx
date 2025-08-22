@@ -1,10 +1,11 @@
 import React, { useEffect, useCallback, createContext, useContext } from 'react';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
-import { addApplication, updateApplication } from '../../store/slices/applicationsSlice';
-import { updateStatistics } from '../../store/slices/statisticsSlice';
-import { setMonitoringStatus, setConnectionStatus } from '../../store/slices/monitorSlice';
-import { webSocketService, WebSocketMessage } from '../../services/websocket';
+import { addApplicationFromWebSocket, updateApplicationFromWebSocket } from '../../store/slices/applicationsSlice';
+import { updateStatisticsFromWebSocket } from '../../store/slices/statisticsSlice';
+import { setMonitoringStatus } from '../../store/slices/monitorSlice';
+import { webSocketService } from '../../services/websocket';
+import type { WebSocketMessage } from '../../services/websocket';
 import { toast } from 'react-hot-toast';
 
 interface WebSocketContextType {
@@ -36,7 +37,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const handleMessage = useCallback((message: WebSocketMessage) => {
     switch (message.type) {
       case 'NEW_APPLICATION':
-        dispatch(addApplication(message.payload));
+        dispatch(addApplicationFromWebSocket(message.payload));
         toast.success(
           `New application: ${message.payload.company} - ${message.payload.position}`,
           { duration: 5000, icon: '📋' }
@@ -44,21 +45,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         break;
 
       case 'APPLICATION_UPDATED':
-        dispatch(updateApplication(message.payload));
-        toast.info(`Application updated: ${message.payload.company}`, { icon: '📝' });
+        dispatch(updateApplicationFromWebSocket(message.payload));
+        toast.success(`Application updated: ${message.payload.company}`, { icon: '📝' });
         break;
 
       case 'STATISTICS_UPDATED':
-        dispatch(updateStatistics(message.payload));
+        dispatch(updateStatisticsFromWebSocket(message.payload));
         break;
 
-      case 'MONITORING_STATUS':
+      case 'MONITORING_STATUS': {
         dispatch(setMonitoringStatus(message.payload.isMonitoring));
         const status = message.payload.isMonitoring ? 'started' : 'stopped';
         toast.success(`Email monitoring ${status}`, { 
           icon: message.payload.isMonitoring ? '▶️' : '⏹️' 
         });
         break;
+      }
 
       case 'CONNECTION_STATUS':
         if (message.payload.status === 'connected') {

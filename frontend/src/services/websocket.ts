@@ -1,7 +1,8 @@
 import { store } from '../store';
-import { addApplication, updateApplication } from '../store/slices/applicationsSlice';
-import { updateStatistics } from '../store/slices/statisticsSlice';
+import { addApplicationFromWebSocket, updateApplicationFromWebSocket } from '../store/slices/applicationsSlice';
+import { updateStatisticsFromWebSocket } from '../store/slices/statisticsSlice';
 import { setMonitoringStatus, setConnectionStatus } from '../store/slices/monitorSlice';
+import type { ApplicationStatus } from '../types/application';
 
 export interface WebSocketMessage {
   type: 'NEW_APPLICATION' | 'APPLICATION_UPDATED' | 'STATISTICS_UPDATED' | 'MONITORING_STATUS' | 'CONNECTION_STATUS';
@@ -10,17 +11,18 @@ export interface WebSocketMessage {
 }
 
 export interface ApplicationPayload {
-  id: string;
+  id: number;
   company: string;
   position: string;
-  status: string;
-  dateApplied: string;
-  source: string;
-  description?: string;
+  status: ApplicationStatus;
+  application_date: string;
+  job_url?: string;
+  job_description?: string;
+  salary_range?: string;
   location?: string;
-  salary?: string;
-  jobUrl?: string;
   notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface StatisticsPayload {
@@ -128,18 +130,18 @@ class WebSocketService {
     switch (message.type) {
       case 'NEW_APPLICATION':
         console.log('📋 New application received:', message.payload.company);
-        store.dispatch(addApplication(message.payload as ApplicationPayload));
+        store.dispatch(addApplicationFromWebSocket(message.payload as ApplicationPayload));
         this.showNotification('New Application', `${message.payload.company} - ${message.payload.position}`);
         break;
 
       case 'APPLICATION_UPDATED':
         console.log('📝 Application updated:', message.payload.id);
-        store.dispatch(updateApplication(message.payload as ApplicationPayload));
+        store.dispatch(updateApplicationFromWebSocket(message.payload as ApplicationPayload));
         break;
 
       case 'STATISTICS_UPDATED':
         console.log('📊 Statistics updated');
-        store.dispatch(updateStatistics(message.payload as StatisticsPayload));
+        store.dispatch(updateStatisticsFromWebSocket(message.payload as StatisticsPayload));
         break;
 
       case 'MONITORING_STATUS':
@@ -290,13 +292,10 @@ class WebSocketService {
 // Export singleton instance
 export const webSocketService = new WebSocketService();
 
-// Request notification permission on service creation
-WebSocketService.requestNotificationPermission().then(granted => {
-  if (granted) {
-    console.log('✅ Notifications enabled');
-  } else {
-    console.log('❌ Notifications denied');
-  }
-});
+// Export the class for static method access
+export { WebSocketService };
+
+// Note: Notification permissions should be requested from user interactions
+// (e.g., when toggling notifications in Settings)
 
 export default webSocketService;

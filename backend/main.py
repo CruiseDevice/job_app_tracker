@@ -3,10 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
 from services.websocket_manager import manager as websocket_manager
 from agent.email_monitor import EmailMonitor
 from database.database_manager import DatabaseManager
 from agent.email_processor import EmailProcessor
+from api.routes import applications, monitor, settings, statistics
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +17,36 @@ db_manager = DatabaseManager()
 email_processor = EmailProcessor()
 email_monitor = EmailMonitor(db_manager, email_processor)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup/shutdown events"""
+    # Startup
+    logger.info("🚀 Starting Smart Job Tracker API...")
+    
+    # Initialize database
+    db_manager.init_db()
+    
+    # Optionally start monitoring on startup
+    # await email_monitor.start_monitoring()
+    
+    yield
+    
+    # Shutdown
+    logger.info("🛑 Shutting down Smart Job Tracker API...")
+    
+    # Stop monitoring
+    await email_monitor.stop_monitoring()
+    
+    # Close database connections
+    await db_manager.close()
+
+
 app = FastAPI(
     title="Smart Job Tracker API",
     description="Backend API for Smart Job Application Tracker with real-time WebSocket support",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -35,6 +63,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include API routes
+app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
+app.include_router(monitor.router, prefix="/api/monitor", tags=["monitor"])
+app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
+app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time communication"""
@@ -49,7 +83,7 @@ async def websocket_endpoint(websocket: WebSocket):
         
         # Send current statistics
         try:
-            stats = await db_manager.get_statistics()
+            stats = db_manager.get_statistics()
             await websocket_manager.send_personal_message(connection_id, {
                 "type": "STATISTICS_UPDATED",
                 "payload": stats
@@ -94,7 +128,7 @@ async def handle_websocket_message(connection_id: str, message: dict):
     
     elif message_type == "get_stats":
         try:
-            stats = await db_manager.get_statistics()
+            stats = db_manager.get_statistics()
             await websocket_manager.send_personal_message(connection_id, {
                 "type": "STATISTICS_UPDATED",
                 "payload": stats
@@ -136,28 +170,6 @@ async def get_monitoring_status():
         "connections": len(websocket_manager.active_connections)
     }
 
-# Startup event to initialize monitoring
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    logger.info("🚀 Starting Smart Job Tracker API...")
-    
-    # Initialize database
-    db_manager.init_db()
-    
-    # Optionally start monitoring on startup
-    # await email_monitor.start_monitoring()
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("🛑 Shutting down Smart Job Tracker API...")
-    
-    # Stop monitoring
-    await email_monitor.stop_monitoring()
-    
-    # Close database connections
-    await db_manager.close()
 
 if __name__ == "__main__":
     import uvicorn

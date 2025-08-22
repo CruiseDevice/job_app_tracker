@@ -1,25 +1,26 @@
 import React from 'react';
-import { useAppSelector } from '../../hooks/redux';
+import { useAppSelector } from '../../hooks/useAppSelector';
 import { webSocketService } from '../../services/websocket';
+import isConnected from '../../services/websocket'
 
 export const ConnectionStatus: React.FC = () => {
-  const { isConnected, isMonitoring } = useAppSelector(state => state.monitor);
+  const is_monitoring  = useAppSelector(state => state.monitor);
   const connectionState = webSocketService.getConnectionState();
 
   const getStatusColor = () => {
-    if (isConnected && isMonitoring) return 'text-green-500';
+    if (isConnected && is_monitoring) return 'text-green-500';
     if (isConnected) return 'text-yellow-500';
     return 'text-red-500';
   };
 
   const getStatusIcon = () => {
-    if (isConnected && isMonitoring) return '🟢';
+    if (isConnected && is_monitoring) return '🟢';
     if (isConnected) return '🟡';
     return '🔴';
   };
 
   const getStatusText = () => {
-    if (isConnected && isMonitoring) return 'Active Monitoring';
+    if (isConnected && is_monitoring) return 'Active Monitoring';
     if (isConnected) return 'Connected';
     return connectionState;
   };

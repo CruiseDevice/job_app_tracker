@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, and_, or_
+from sqlalchemy import create_engine, and_, or_, func
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
@@ -173,11 +173,34 @@ class DatabaseManager:
             interview_rate = (status_counts.get("interview", 0) / total * 100) if total > 0 else 0
             response_rate = ((status_counts.get("interview", 0) + status_counts.get("rejected", 0)) / total * 100) if total > 0 else 0
 
+            # Calculate average per day (last 30 days)
+            thirty_days_ago = now - timedelta(days=30)
+            recent_applications = session.query(JobApplication).filter(
+                JobApplication.created_at >= thirty_days_ago
+            ).count()
+            avg_per_day = recent_applications / 30 if recent_applications > 0 else 0
+
+            # Get top companies
+            top_companies_query = session.query(
+                JobApplication.company,
+                func.count(JobApplication.id).label('count')
+            ).group_by(JobApplication.company).order_by(func.count(JobApplication.id).desc()).limit(5)
+            
+            top_companies = []
+            for company, count in top_companies_query:
+                top_companies.append({"company": company, "count": count})
+
+            # Create status distribution (same as byStatus but with different key names)
+            status_distribution = {status: count for status, count in status_counts.items()}
+
             return {
                 "total": total,
                 "today": today,
                 "thisWeek": this_week,
                 "thisMonth": this_month,
+                "avgPerDay": round(avg_per_day, 1),
+                "topCompanies": top_companies,
+                "statusDistribution": status_distribution,
                 "byStatus": status_counts,
                 "interviewRate": round(interview_rate, 1),
                 "responseRate": round(response_rate, 1)
@@ -190,6 +213,9 @@ class DatabaseManager:
                 "today": 0,
                 "thisWeek": 0,
                 "thisMonth": 0,
+                "avgPerDay": 0,
+                "topCompanies": [],
+                "statusDistribution": {},
                 "byStatus": {},
                 "interviewRate": 0,
                 "responseRate": 0
@@ -227,6 +253,15 @@ class DatabaseManager:
             logger.error(f"Error logging email processing: {e}")
         finally:
             session.close()
+
+    async def close(self):
+        """Close database connections"""
+        try:
+            if hasattr(self, 'engine'):
+                self.engine.dispose()
+                logger.info("Database connections closed successfully")
+        except Exception as e:
+            logger.error(f"Error closing database connections: {e}")
 
 # Create global instance
 db_manager = DatabaseManager()

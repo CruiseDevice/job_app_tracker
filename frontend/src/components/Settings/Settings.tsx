@@ -5,6 +5,40 @@ import { useAppSelector } from '../../hooks/useAppSelector';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
 import { setTheme, toggleNotifications, toggleAutoRefresh } from '../../store/slices/settingsSlice';
 import { Save, Bell, RefreshCw, Palette, Mail, Database, Shield } from 'lucide-react';
+import { WebSocketService } from '../../services/websocket';
+
+// Type definitions for settings
+type SettingToggle = {
+  label: string;
+  type: 'toggle';
+  value: boolean;
+  onChange: () => void;
+};
+
+type SettingSelect = {
+  label: string;
+  type: 'select';
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+};
+
+type SettingNumber = {
+  label: string;
+  type: 'number';
+  value: number;
+  onChange: (value: number) => void;
+};
+
+type SettingButton = {
+  label: string;
+  type: 'button';
+  value: string;
+  onClick: () => void;
+  danger?: boolean;
+};
+
+type Setting = SettingToggle | SettingSelect | SettingNumber | SettingButton;
 
 const Settings: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -20,7 +54,32 @@ const Settings: React.FC = () => {
     }, 1000);
   };
 
-  const settingsGroups = [
+  const handleNotificationToggle = async () => {
+    if (!settings.notifications) {
+      // User is enabling notifications, request permission
+      try {
+        const granted = await WebSocketService.requestNotificationPermission();
+        if (granted) {
+          dispatch(toggleNotifications());
+        } else {
+          // Permission denied, show user feedback
+          console.log('Notification permission denied by user');
+          // You could add a toast notification here
+        }
+      } catch (error) {
+        console.error('Error requesting notification permission:', error);
+      }
+    } else {
+      // User is disabling notifications, just toggle
+      dispatch(toggleNotifications());
+    }
+  };
+
+  const settingsGroups: Array<{
+    title: string;
+    icon: React.ComponentType<{ className?: string }>;
+    settings: Setting[];
+  }> = [
     {
       title: 'Appearance',
       icon: Palette,
@@ -45,7 +104,7 @@ const Settings: React.FC = () => {
           label: 'Enable notifications',
           type: 'toggle' as const,
           value: settings.notifications,
-          onChange: () => dispatch(toggleNotifications())
+          onChange: handleNotificationToggle
         }
       ]
     },
@@ -185,7 +244,7 @@ const Settings: React.FC = () => {
                       <button
                         onClick={setting.onClick}
                         className={`px-4 py-2 text-sm font-medium rounded-md ${
-                          setting.danger
+                          (setting as SettingButton).danger
                             ? 'text-red-700 bg-red-100 hover:bg-red-200'
                             : 'text-blue-700 bg-blue-100 hover:bg-blue-200'
                         }`}
