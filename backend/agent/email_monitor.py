@@ -101,10 +101,13 @@ class EmailMonitor:
                         app_id = await self.db_manager.add_application(application_data)
                         application_data['id'] = app_id
                         
+                        # Convert application data to serializable format before broadcasting
+                        serializable_data = self._make_serializable(application_data)
+                        
                         # Broadcast new application via WebSocket
                         await websocket_manager.broadcast({
                             "type": "NEW_APPLICATION",
-                            "payload": application_data
+                            "payload": serializable_data
                         })
                         
                         new_applications += 1
@@ -151,19 +154,35 @@ class EmailMonitor:
         """Update application status and broadcast change"""
         try:
             # Update in database
-            updated_app = await self.db_manager.update_application_status(app_id, new_status)
+            updated_app = await self.db_manager.update_application_status(int(app_id), new_status)
             
             if updated_app:
+                # Convert to serializable format before broadcasting
+                serializable_app = self._make_serializable(updated_app)
+                
                 # Broadcast update via WebSocket
                 await websocket_manager.broadcast({
                     "type": "APPLICATION_UPDATED",
-                    "payload": updated_app
+                    "payload": serializable_app
                 })
                 
                 # Update statistics
                 await self._update_and_broadcast_statistics()
                 
                 logger.info(f"📝 Application {app_id} status updated to: {new_status}")
+            else:
+                logger.warning(f"⚠️ Application {app_id} not found for status update")
             
         except Exception as e:
             logger.error(f"❌ Error updating application status: {e}")
+
+    def _make_serializable(self, data: Any) -> Any:
+        """Convert data to JSON serializable format by converting datetime objects to strings"""
+        if isinstance(data, dict):
+            return {key: self._make_serializable(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [self._make_serializable(item) for item in data]
+        elif isinstance(data, datetime):
+            return data.isoformat()
+        else:
+            return data

@@ -31,15 +31,38 @@ class DatabaseManager:
         """Get database session"""
         return self.SessionLocal()
 
-    def add_application(self, application_data: Dict[str, Any]) -> int:
+    async def add_application(self, application_data: Dict[str, Any]) -> int:
         """Add new job application"""
         session = self.get_session()
         try:
             # Convert string date to datetime if needed
             if isinstance(application_data.get('application_date'), str):
-                application_data['application_date'] = datetime.fromisoformat(
-                    application_data['application_date'].replace('Z', '+00:00')
-                )
+                date_str = application_data['application_date']
+                try:
+                    # Try ISO format first
+                    if 'T' in date_str or 'Z' in date_str:
+                        application_data['application_date'] = datetime.fromisoformat(
+                            date_str.replace('Z', '+00:00')
+                        )
+                    else:
+                        # Try common date formats
+                        for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y-%m-%d %H:%M:%S']:
+                            try:
+                                application_data['application_date'] = datetime.strptime(date_str, fmt)
+                                break
+                            except ValueError:
+                                continue
+                        else:
+                            # If all formats fail, use current date
+                            logger.warning(f"Could not parse date '{date_str}', using current date")
+                            application_data['application_date'] = datetime.now()
+                except Exception as e:
+                    logger.warning(f"Date parsing failed for '{date_str}': {e}, using current date")
+                    application_data['application_date'] = datetime.now()
+            
+            # Ensure we have a valid date
+            if not application_data.get('application_date'):
+                application_data['application_date'] = datetime.now()
             
             application = JobApplication(**application_data)
             session.add(application)
@@ -110,8 +133,8 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def update_application_status(self, application_id: int, status: str) -> bool:
-        """Update application status"""
+    async def update_application_status(self, application_id: int, status: str) -> Optional[Dict[str, Any]]:
+        """Update application status and return updated application data"""
         session = self.get_session()
         try:
             application = session.query(JobApplication).filter(
@@ -122,48 +145,50 @@ class DatabaseManager:
                 application.status = status
                 application.updated_at = datetime.now()
                 session.commit()
+                session.refresh(application)
                 logger.info(f"Updated application {application_id} status to {status}")
-                return True
-            return False
+                
+                # Return the updated application data
+                return application.to_dict()
+            return None
             
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(f"Error updating application status: {e}")
-            return False
+            return None
         finally:
             session.close()
 
-    def get_statistics(self) -> Dict[str, Any]:
-        """Get application statistics"""
+    async def get_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive application statistics"""
         session = self.get_session()
         try:
             now = datetime.now()
-            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            week_start = today_start - timedelta(days=now.weekday())
-            month_start = today_start.replace(day=1)
-
-            # Total applications
+            today = now.date()
+            this_week_start = today - timedelta(days=today.weekday())
+            this_month_start = today.replace(day=1)
+            
+            # Get total applications
             total = session.query(JobApplication).count()
-
-            # Today's applications
+            
+            # Get today's applications
             today = session.query(JobApplication).filter(
-                JobApplication.created_at >= today_start
+                func.date(JobApplication.created_at) == today
             ).count()
-
-            # This week's applications
+            
+            # Get this week's applications
             this_week = session.query(JobApplication).filter(
-                JobApplication.created_at >= week_start
+                JobApplication.created_at >= this_week_start
             ).count()
-
-            # This month's applications
+            
+            # Get this month's applications
             this_month = session.query(JobApplication).filter(
-                JobApplication.created_at >= month_start
+                JobApplication.created_at >= this_month_start
             ).count()
-
-            # Applications by status
+            
+            # Get status distribution
             status_counts = {}
-            statuses = ["applied", "interview", "assessment", "rejected", "offer"]
-            for status in statuses:
+            for status in ["applied", "interview", "offer", "rejected", "assessment"]:
                 count = session.query(JobApplication).filter(
                     JobApplication.status == status
                 ).count()
@@ -223,7 +248,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def is_email_processed(self, email_id: str) -> bool:
+    async def is_email_processed(self, email_id: str) -> bool:
         """Check if email has been processed"""
         session = self.get_session()
         try:
@@ -234,6 +259,33 @@ class DatabaseManager:
         except SQLAlchemyError as e:
             logger.error(f"Error checking email processing status: {e}")
             return False
+        finally:
+            session.close()
+
+    async def mark_email_processed(self, email_id: str):
+        """Mark email as processed"""
+        session = self.get_session()
+        try:
+            # Check if already logged
+            existing_log = session.query(EmailProcessingLog).filter(
+                EmailProcessingLog.email_id == email_id
+            ).first()
+            
+            if not existing_log:
+                log = EmailProcessingLog(
+                    email_id=email_id,
+                    is_job_related=True,  # Assume it was processed for job-related content
+                    confidence_score=1.0
+                )
+                session.add(log)
+                session.commit()
+                logger.info(f"Marked email {email_id} as processed")
+            else:
+                logger.debug(f"Email {email_id} already marked as processed")
+                
+        except SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Error marking email as processed: {e}")
         finally:
             session.close()
 

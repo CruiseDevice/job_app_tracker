@@ -4,33 +4,28 @@ import os
 import re
 import logging
 import asyncio
+import imaplib
+import email
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
-from email.mime.text import MIMEText
-from email.utils import parsedate_to_datetime
-
-# Gmail API imports
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+from email.header import decode_header
 
 # LLM imports (using OpenAI as example - can be swapped for other providers)
 import openai
 from openai import AsyncOpenAI
 
+# Import settings
+from config.settings import settings
+
 logger = logging.getLogger(__name__)
 
 class EmailProcessor:
-    def __init__(self, credentials_path: str = "credentials.json", token_path: str = "token.json"):
-        self.credentials_path = credentials_path
-        self.token_path = token_path
-        self.service = None
+    def __init__(self):
+        self.email_address = settings.email_address
+        self.email_password = settings.email_password
+        self.imap_server = "imap.gmail.com"  # Default to Gmail
+        self.imap_port = 993
         self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        
-        # Gmail API scopes
-        self.SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
         
         # Job-related keywords for initial filtering (privacy protection)
         self.JOB_KEYWORDS = [
@@ -50,159 +45,224 @@ class EmailProcessor:
         ]
 
     async def initialize(self):
-        """Initialize Gmail API service"""
+        """Initialize email connection"""
         try:
-            creds = await self._get_credentials()
-            self.service = build('gmail', 'v1', credentials=creds)
-            logger.info("✅ Gmail API service initialized successfully")
+            if not self.email_address or not self.email_password:
+                raise ValueError(
+                    "Missing email credentials. Please set EMAIL_ADDRESS and EMAIL_PASSWORD in your .env file"
+                )
+            
+            # Test connection
+            await self._test_connection()
+            logger.info("✅ Email connection initialized successfully")
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Gmail API: {e}")
+            logger.error(f"❌ Failed to initialize email connection: {e}")
             raise
 
-    async def _get_credentials(self) -> Credentials:
-        """Get or refresh Gmail API credentials"""
-        creds = None
-        
-        # Load existing token
-        if os.path.exists(self.token_path):
-            creds = Credentials.from_authorized_user_file(self.token_path, self.SCOPES)
-        
-        # If no valid credentials, go through OAuth flow
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    logger.info("🔄 Gmail credentials refreshed")
-                except Exception as e:
-                    logger.error(f"❌ Failed to refresh credentials: {e}")
-                    creds = None
+    async def _test_connection(self):
+        """Test IMAP connection"""
+        try:
+            # Use asyncio to run blocking IMAP operations
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, self._connect_and_test)
+        except Exception as e:
+            raise Exception(f"Connection test failed: {e}")
+
+    def _connect_and_test(self):
+        """Blocking IMAP connection test"""
+        try:
+            # Connect to IMAP server
+            imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
             
-            if not creds:
-                if not os.path.exists(self.credentials_path):
-                    raise FileNotFoundError(f"Gmail credentials file not found: {self.credentials_path}")
-                
-                flow = InstalledAppFlow.from_client_secrets_file(self.credentials_path, self.SCOPES)
-                creds = flow.run_local_server(port=0)
-                logger.info("🔑 New Gmail credentials obtained")
+            # Login
+            imap.login(self.email_address, self.email_password)
             
-            # Save credentials for next run
-            with open(self.token_path, 'w') as token:
-                token.write(creds.to_json())
-        
-        return creds
+            # Test access to INBOX
+            imap.select('INBOX')
+            
+            # Close connection
+            imap.close()
+            imap.logout()
+            
+        except Exception as e:
+            raise Exception(f"IMAP connection failed: {e}")
 
     async def fetch_recent_emails(self, hours: int = 24, max_results: int = 100) -> List[Dict[str, Any]]:
-        """Fetch recent emails from Gmail"""
-        if not self.service:
-            await self.initialize()
-        
+        """Fetch recent emails using IMAP"""
         try:
-            # Calculate date range
-            after_date = datetime.now() - timedelta(hours=hours)
-            after_timestamp = int(after_date.timestamp())
+            if not self.email_address or not self.email_password:
+                raise ValueError("Email credentials not configured")
             
-            # Build query for recent emails
-            query = f'after:{after_timestamp}'
+            # Use asyncio to run blocking IMAP operations
+            loop = asyncio.get_event_loop()
+            emails = await loop.run_in_executor(
+                None, 
+                self._fetch_emails_sync, 
+                hours, 
+                max_results
+            )
             
-            logger.info(f"🔍 Fetching emails from last {hours} hours...")
-            
-            # Get message list
-            results = self.service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=max_results
-            ).execute()
-            
-            messages = results.get('messages', [])
-            logger.info(f"📧 Found {len(messages)} recent emails")
-            
-            # Fetch detailed email data
-            emails = []
-            for message in messages:
-                try:
-                    email_data = await self._get_email_details(message['id'])
-                    if email_data:
-                        emails.append(email_data)
-                except Exception as e:
-                    logger.error(f"❌ Error fetching email {message['id']}: {e}")
-                    continue
-            
-            logger.info(f"✅ Successfully processed {len(emails)} emails")
+            logger.info(f"✅ Successfully fetched {len(emails)} emails")
             return emails
             
-        except HttpError as e:
-            logger.error(f"❌ Gmail API error: {e}")
-            return []
         except Exception as e:
             logger.error(f"❌ Error fetching emails: {e}")
             return []
 
-    async def _get_email_details(self, message_id: str) -> Optional[Dict[str, Any]]:
-        """Get detailed information for a specific email"""
+    def _fetch_emails_sync(self, hours: int, max_results: int) -> List[Dict[str, Any]]:
+        """Synchronous email fetching using IMAP"""
+        emails = []
+        
         try:
-            message = self.service.users().messages().get(
-                userId='me',
-                id=message_id,
-                format='full'
-            ).execute()
+            # Connect to IMAP server
+            imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
+            imap.login(self.email_address, self.email_password)
             
+            # Select INBOX
+            imap.select('INBOX')
+            
+            # Search for recent emails
+            # Gmail supports date search: SINCE "01-Jan-2024"
+            since_date = (datetime.now() - timedelta(hours=hours)).strftime("%d-%b-%Y")
+            search_criteria = f'SINCE "{since_date}"'
+            
+            # Search for emails
+            status, message_numbers = imap.search(None, search_criteria)
+            
+            if status != 'OK':
+                logger.error("❌ IMAP search failed")
+                return emails
+            
+            # Get message numbers
+            message_list = message_numbers[0].split()
+            
+            # Limit results
+            if len(message_list) > max_results:
+                message_list = message_list[-max_results:]  # Get most recent
+            
+            logger.info(f"🔍 Found {len(message_list)} emails in last {hours} hours")
+            
+            # Fetch each email
+            for num in message_list:
+                try:
+                    # Fetch email data
+                    status, msg_data = imap.fetch(num, '(RFC822)')
+                    
+                    if status != 'OK':
+                        continue
+                    
+                    # Parse email
+                    email_body = msg_data[0][1]
+                    email_message = email.message_from_bytes(email_body)
+                    
+                    # Extract email details
+                    email_data = self._parse_email_message(email_message, num.decode())
+                    if email_data:
+                        emails.append(email_data)
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error parsing email {num}: {e}")
+                    continue
+            
+            # Close connection
+            imap.close()
+            imap.logout()
+            
+        except Exception as e:
+            logger.error(f"❌ IMAP error: {e}")
+        
+        return emails
+
+    def _parse_email_message(self, email_message, message_id: str) -> Optional[Dict[str, Any]]:
+        """Parse email message and extract relevant information"""
+        try:
             # Extract headers
-            headers = {
-                header['name'].lower(): header['value']
-                for header in message['payload'].get('headers', [])
-            }
+            subject = self._decode_header(email_message.get('Subject', ''))
+            sender = self._decode_header(email_message.get('From', ''))
+            date = email_message.get('Date', '')
             
-            # Extract email body
-            body = self._extract_email_body(message['payload'])
+            # Extract body
+            body = self._extract_email_body(email_message)
             
-            # Basic email info
+            # Create email data structure
             email_data = {
                 'id': message_id,
-                'subject': headers.get('subject', ''),
-                'sender': headers.get('from', ''),
-                'date': headers.get('date', ''),
+                'subject': subject,
+                'sender': sender,
+                'date': date,
                 'body': body,
-                'headers': headers
+                'headers': {
+                    'subject': subject,
+                    'from': sender,
+                    'date': date
+                }
             }
             
             return email_data
             
         except Exception as e:
-            logger.error(f"❌ Error getting email details for {message_id}: {e}")
+            logger.error(f"❌ Error parsing email message: {e}")
             return None
 
-    def _extract_email_body(self, payload: Dict) -> str:
-        """Extract text content from email payload"""
+    def _decode_header(self, header_value: str) -> str:
+        """Decode email header values"""
+        try:
+            decoded_parts = decode_header(header_value)
+            decoded_string = ""
+            
+            for part, encoding in decoded_parts:
+                if isinstance(part, bytes):
+                    if encoding:
+                        decoded_string += part.decode(encoding)
+                    else:
+                        decoded_string += part.decode('utf-8', errors='ignore')
+                else:
+                    decoded_string += str(part)
+            
+            return decoded_string
+        except Exception:
+            return str(header_value)
+
+    def _extract_email_body(self, email_message) -> str:
+        """Extract text content from email message"""
         body = ""
         
-        def extract_parts(parts):
-            nonlocal body
-            for part in parts:
-                if part['mimeType'] == 'text/plain':
-                    data = part['body'].get('data', '')
-                    if data:
-                        import base64
-                        body += base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
-                elif part['mimeType'] == 'text/html' and not body:
-                    # Only use HTML if no plain text found
-                    data = part['body'].get('data', '')
-                    if data:
-                        import base64
-                        html_content = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+        if email_message.is_multipart():
+            for part in email_message.walk():
+                content_type = part.get_content_type()
+                content_disposition = str(part.get('Content-Disposition'))
+                
+                # Skip attachments
+                if 'attachment' in content_disposition:
+                    continue
+                
+                if content_type == 'text/plain':
+                    try:
+                        body += part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                    except Exception:
+                        continue
+                elif content_type == 'text/html' and not body:
+                    # Use HTML if no plain text found
+                    try:
+                        html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         # Simple HTML to text conversion
                         body += re.sub(r'<[^>]+>', ' ', html_content)
-                elif 'parts' in part:
-                    extract_parts(part['parts'])
-        
-        if 'parts' in payload:
-            extract_parts(payload['parts'])
+                    except Exception:
+                        continue
         else:
             # Single part message
-            if payload['mimeType'] == 'text/plain':
-                data = payload['body'].get('data', '')
-                if data:
-                    import base64
-                    body = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+            content_type = email_message.get_content_type()
+            if content_type == 'text/plain':
+                try:
+                    body = email_message.get_payload(decode=True).decode('utf-8', errors='ignore')
+                except Exception:
+                    body = ""
+            elif content_type == 'text/html':
+                try:
+                    html_content = email_message.get_payload(decode=True).decode('utf-8', errors='ignore')
+                    body = re.sub(r'<[^>]+>', ' ', html_content)
+                except Exception:
+                    body = ""
         
         return body.strip()
 
@@ -331,23 +391,30 @@ Be accurate and only extract information that's clearly stated in the email.
                 return None
             
             # Extract and validate required fields
+            # Ensure we always have a valid application_date
+            app_date = result.get('application_date')
+            if not app_date or app_date == 'None' or app_date == '':
+                app_date = datetime.now().strftime('%Y-%m-%d')
+                logger.info(f"📅 No application date found, using current date: {app_date}")
+            else:
+                logger.info(f"📅 Using extracted application date: {app_date}")
+            
             application_data = {
                 'company': result.get('company', 'Unknown'),
                 'position': result.get('position', 'Unknown'),
                 'status': result.get('status', 'applied'),
-                'dateApplied': result.get('application_date', datetime.now().strftime('%Y-%m-%d')),
-                'source': 'email',
-                'description': result.get('description', ''),
+                'application_date': app_date,
+                'job_description': result.get('description', ''),
                 'location': result.get('location', ''),
-                'salary': result.get('salary', ''),
-                'jobUrl': result.get('job_url', ''),
+                'salary_range': result.get('salary', ''),
+                'job_url': result.get('job_url', ''),
                 'notes': result.get('notes', ''),
-                'emailId': email_data.get('id', ''),
-                'emailSubject': email_data.get('subject', ''),
-                'emailSender': email_data.get('sender', ''),
-                'createdAt': datetime.now().isoformat(),
-                'updatedAt': datetime.now().isoformat()
+                'email_thread_id': email_data.get('id', ''),
+                'email_subject': email_data.get('subject', ''),
+                'email_sender': email_data.get('sender', '')
             }
+            
+            logger.info(f"📝 Prepared application data: {application_data}")
             
             return application_data
             
@@ -362,19 +429,20 @@ Be accurate and only extract information that's clearly stated in the email.
     async def test_email_processing(self, test_email_id: str) -> Dict[str, Any]:
         """Test email processing with a specific email ID"""
         try:
-            if not self.service:
-                await self.initialize()
+            # For IMAP, we can't easily fetch by ID, so we'll fetch recent emails instead
+            emails = await self.fetch_recent_emails(hours=24, max_results=10)
             
-            email_data = await self._get_email_details(test_email_id)
-            if not email_data:
-                return {"error": "Could not fetch email"}
+            if not emails:
+                return {"error": "No emails found"}
             
-            result = await self.process_email(email_data)
+            # Process the first email as a test
+            test_email = emails[0]
+            result = await self.process_email(test_email)
             
             return {
-                "email_id": test_email_id,
-                "subject": email_data.get('subject', ''),
-                "sender": email_data.get('sender', ''),
+                "email_id": test_email['id'],
+                "subject": test_email.get('subject', ''),
+                "sender": test_email.get('sender', ''),
                 "is_job_related": result is not None,
                 "extracted_data": result
             }

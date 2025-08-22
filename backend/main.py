@@ -83,7 +83,7 @@ async def websocket_endpoint(websocket: WebSocket):
         
         # Send current statistics
         try:
-            stats = db_manager.get_statistics()
+            stats = await db_manager.get_statistics()
             await websocket_manager.send_personal_message(connection_id, {
                 "type": "STATISTICS_UPDATED",
                 "payload": stats
@@ -128,7 +128,7 @@ async def handle_websocket_message(connection_id: str, message: dict):
     
     elif message_type == "get_stats":
         try:
-            stats = db_manager.get_statistics()
+            stats = await db_manager.get_statistics()
             await websocket_manager.send_personal_message(connection_id, {
                 "type": "STATISTICS_UPDATED",
                 "payload": stats

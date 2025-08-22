@@ -11,9 +11,9 @@ class Settings(BaseSettings):
     api_port: int = 8000
     debug: bool = True
     
-    # Google API
-    google_client_id: Optional[str] = None
-    google_client_secret: Optional[str] = None
+    # Email credentials (simple IMAP approach)
+    email_address: Optional[str] = None
+    email_password: Optional[str] = None
     
     # OpenAI API
     openai_api_key: Optional[str] = None

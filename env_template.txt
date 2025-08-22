@@ -1,4 +1,20 @@
 # Email credentials for job application monitoring
 # Copy these variables to your .env file:
+
+# Email credentials (IMAP)
 EMAIL_ADDRESS=your_email@example.com
 EMAIL_PASSWORD=your_app_password
+
+# OpenAI API key for email analysis
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Optional: Database configuration
+DATABASE_URL=sqlite:///./database.db
+
+# Optional: API settings
+API_HOST=127.0.0.1
+API_PORT=8000
+DEBUG=true
+
+# Optional: Email monitoring interval (in seconds)
+EMAIL_CHECK_INTERVAL=300
