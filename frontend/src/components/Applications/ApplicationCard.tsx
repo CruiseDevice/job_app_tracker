@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import { ExternalLink, Calendar, MapPin, DollarSign, Clock, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import type { JobApplication, ApplicationStatus } from '../../types/application';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
-import { updateApplicationStatus, deleteApplication } from '../../store/slices/applicationsSlice';
+import { updateApplicationStatus, updateApplication, deleteApplication } from '../../store/slices/applicationsSlice';
 import StatusBadge from './StatusBadge';
+import EditApplicationModal from './EditApplicationModal';
 
 interface ApplicationCardProps {
   application: JobApplication;
@@ -17,6 +18,7 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -57,9 +59,17 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
   };
 
   const handleEdit = () => {
-    // TODO: Open edit modal
-    console.log('Edit application', application.id);
+    setShowEditModal(true);
     setShowActions(false);
+  };
+
+  const handleSaveEdit = async (data: Partial<JobApplication>) => {
+    try {
+      await dispatch(updateApplication({ id: application.id, data })).unwrap();
+    } catch (error) {
+      console.error('Failed to save application:', error);
+      throw error; // Re-throw so the modal can handle it
+    }
   };
 
   const handleDelete = () => {
@@ -232,6 +242,14 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      <EditApplicationModal
+        application={application}
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSave={handleSaveEdit}
+      />
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (

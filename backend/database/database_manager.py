@@ -159,6 +159,54 @@ class DatabaseManager:
         finally:
             session.close()
 
+    async def update_application(self, application_id: int, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update application with provided data and return updated application data"""
+        session = self.get_session()
+        try:
+            application = session.query(JobApplication).filter(
+                JobApplication.id == application_id
+            ).first()
+
+            if not application:
+                return None
+
+            # List of updatable fields
+            updatable_fields = [
+                'company', 'position', 'application_date', 'status',
+                'job_url', 'job_description', 'salary_range', 'location', 'notes'
+            ]
+
+            # Update only provided fields
+            for field, value in update_data.items():
+                if field in updatable_fields and hasattr(application, field):
+                    # Special handling for date fields
+                    if field == 'application_date' and isinstance(value, str):
+                        try:
+                            # Parse date string to datetime object
+                            from datetime import datetime as dt
+                            parsed_date = dt.strptime(value, '%Y-%m-%d').date()
+                            setattr(application, field, parsed_date)
+                        except ValueError:
+                            logger.error(f"Invalid date format for {field}: {value}")
+                            continue
+                    else:
+                        setattr(application, field, value)
+
+            application.updated_at = datetime.now()
+            session.commit()
+            session.refresh(application)
+            logger.info(f"Updated application {application_id}")
+
+            # Return the updated application data
+            return application.to_dict()
+
+        except SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Error updating application: {e}")
+            return None
+        finally:
+            session.close()
+
     async def get_statistics(self) -> Dict[str, Any]:
         """Get comprehensive application statistics"""
         session = self.get_session()

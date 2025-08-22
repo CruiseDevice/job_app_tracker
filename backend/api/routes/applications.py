@@ -52,6 +52,31 @@ async def get_application(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving application: {str(e)}")
 
+@router.put("/{application_id}")
+async def update_application(
+    application_id: int,
+    application_data: Dict[str, Any],
+    db: DatabaseManager = Depends(get_db)
+):
+    """Update application"""
+    try:
+        # Validate status if provided
+        if "status" in application_data:
+            valid_statuses = ["applied", "interview", "assessment", "rejected", "offer"]
+            if application_data["status"] not in valid_statuses:
+                raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+
+        updated_app = await db.update_application(application_id, application_data)
+        if not updated_app:
+            raise HTTPException(status_code=404, detail="Application not found")
+
+        return {"message": "Application updated successfully", "application": updated_app}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating application: {str(e)}")
+
 @router.put("/{application_id}/status")
 async def update_application_status(
     application_id: int, 
@@ -68,7 +93,7 @@ async def update_application_status(
         if status not in valid_statuses:
             raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
         
-        success = db.update_application_status(application_id, status)
+        success = await db.update_application_status(application_id, status)
         if not success:
             raise HTTPException(status_code=404, detail="Application not found")
             

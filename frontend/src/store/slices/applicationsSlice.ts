@@ -51,6 +51,14 @@ export const addApplication = createAsyncThunk(
   }
 );
 
+export const updateApplication = createAsyncThunk(
+  'applications/updateApplication',
+  async ({ id, data }: { id: number; data: Partial<JobApplication> }) => {
+    const updatedApplication = await applicationsApi.updateApplication(id, data);
+    return updatedApplication;
+  }
+);
+
 export const deleteApplication = createAsyncThunk(
   'applications/deleteApplication',
   async (id: number) => {
@@ -105,6 +113,17 @@ const applicationsSlice = createSlice({
         if (application) {
           application.status = status as any;
           application.updated_at = new Date().toISOString();
+        }
+      })
+      // Update application
+      .addCase(updateApplication.fulfilled, (state, action) => {
+        const updatedApp = action.payload;
+        const index = state.applications.findIndex(app => app.id === updatedApp.id);
+        if (index !== -1) {
+          state.applications[index] = updatedApp;
+        }
+        if (state.currentApplication?.id === updatedApp.id) {
+          state.currentApplication = updatedApp;
         }
       })
       // Add application

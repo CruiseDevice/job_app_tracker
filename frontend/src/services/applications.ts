@@ -25,6 +25,12 @@ export const applicationsApi = {
     await api.put(`/applications/${id}/status`, { status });
   },
 
+  // Update application
+  updateApplication: async (id: number, data: Partial<JobApplication>): Promise<JobApplication> => {
+    const response = await api.put(`/applications/${id}`, data);
+    return response.data.application;
+  },
+
   // Add manual application
   addManualApplication: async (data: CreateApplicationRequest): Promise<{ id: number; message: string }> => {
     const response = await api.post('/applications/manual', data);
