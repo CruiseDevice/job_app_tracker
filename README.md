@@ -215,3 +215,9 @@ npm run lint
 ## License
 
 This project is private and intended for personal use.
+
+---
+
+## Acknowledgements
+
+This entire project was built using AI assistance, including code generation, design suggestions, and documentation help. Special thanks to the open-source community and AI tools that made rapid development possible.
