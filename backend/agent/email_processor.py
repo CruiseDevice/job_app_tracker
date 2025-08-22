@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from email.header import decode_header
 
 # LLM imports (using OpenAI as example - can be swapped for other providers)
-import openai
 from openai import AsyncOpenAI
 
 # Import settings
@@ -33,7 +32,9 @@ class EmailProcessor:
             'hiring', 'recruitment', 'hr', 'human resources', 'talent',
             'opportunity', 'opening', 'vacancy', 'candidate', 'resume',
             'cv', 'application received', 'thank you for applying',
-            'next steps', 'assessment', 'screening', 'offer', 'compensation'
+            'next steps', 'assessment', 'screening', 'offer', 'compensation',
+            'schedule', 'scheduling', 'interview invitation', 'phone screen',
+            'video call', 'meeting', 'time slot', 'available times'
         ]
         
         # Email domains that commonly send job-related emails
@@ -41,7 +42,8 @@ class EmailProcessor:
             'greenhouse.io', 'lever.co', 'workday.com', 'successfactors.com',
             'taleo.net', 'bamboohr.com', 'namely.com', 'paycom.com',
             'ultipro.com', 'adp.com', 'workable.com', 'smartrecruiters.com',
-            'jobvite.com', 'icims.com', 'cornerstone.com', 'recruitee.com'
+            'jobvite.com', 'icims.com', 'cornerstone.com', 'recruitee.com',
+            'rippling.com'
         ]
 
     async def initialize(self):
@@ -343,7 +345,7 @@ Return your response in JSON format with the following structure:
     "company": "Company name",
     "position": "Job title/position",
     "location": "Job location (if mentioned)",
-    "status": "applied/interview_scheduled/offer_received/rejected/assessment_received",
+    "status": "applied/interview/offer/rejected/assessment",
     "description": "Brief job description (if available)",
     "salary": "Salary range (if mentioned)",
     "job_url": "Job posting URL (if available)",
@@ -355,11 +357,19 @@ Only return valid JSON. If it's not a job application email, set "is_job_applica
 
 Guidelines:
 - Look for confirmation emails after submitting applications
-- Interview scheduling emails
-- Job assessment or test invitations  
-- Offer letters or rejection emails
+- Interview scheduling emails (use status "interview")
+- Job assessment or test invitations (use status "assessment")
+- Offer letters (use status "offer")
+- Rejection emails (use status "rejected")
 - Recruiter outreach emails
 - Application status updates
+
+Status mapping:
+- "applied": Initial applications or confirmations
+- "interview": Interview invitations, scheduling, or related communications
+- "assessment": Technical tests, coding challenges, or assessments
+- "offer": Job offers or offer-related communications
+- "rejected": Rejection notifications
 
 IMPORTANT for job position extraction:
 - If the email doesn't specify a job title, try to infer from context
