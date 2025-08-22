@@ -306,6 +306,28 @@ class DatabaseManager:
         finally:
             session.close()
 
+    async def delete_application(self, application_id: int) -> bool:
+        """Delete job application"""
+        session = self.get_session()
+        try:
+            application = session.query(JobApplication).filter(
+                JobApplication.id == application_id
+            ).first()
+            
+            if application:
+                session.delete(application)
+                session.commit()
+                logger.info(f"Deleted application {application_id}")
+                return True
+            return False
+            
+        except SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Error deleting application: {e}")
+            return False
+        finally:
+            session.close()
+
     async def close(self):
         """Close database connections"""
         try:

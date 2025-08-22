@@ -361,6 +361,12 @@ Guidelines:
 - Recruiter outreach emails
 - Application status updates
 
+IMPORTANT for job position extraction:
+- If the email doesn't specify a job title, try to infer from context
+- For SimplyHired/job board confirmations, look in subject line or body for position hints
+- If no position can be determined, use "Position Not Specified" as the value
+- Never leave the position field empty or null
+
 Be accurate and only extract information that's clearly stated in the email.
 """.format(email_content=email_content)
 
@@ -399,9 +405,14 @@ Be accurate and only extract information that's clearly stated in the email.
             else:
                 logger.info(f"📅 Using extracted application date: {app_date}")
             
+            # Ensure we have required fields
+            position = result.get('position') or 'Position Not Specified'
+            if not position or position.lower() in ['none', 'null', '']:
+                position = 'Position Not Specified'
+            
             application_data = {
                 'company': result.get('company', 'Unknown'),
-                'position': result.get('position', 'Unknown'),
+                'position': position,
                 'status': result.get('status', 'applied'),
                 'application_date': app_date,
                 'job_description': result.get('description', ''),

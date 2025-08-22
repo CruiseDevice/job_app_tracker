@@ -51,6 +51,14 @@ export const addApplication = createAsyncThunk(
   }
 );
 
+export const deleteApplication = createAsyncThunk(
+  'applications/deleteApplication',
+  async (id: number) => {
+    await applicationsApi.deleteApplication(id);
+    return id;
+  }
+);
+
 const applicationsSlice = createSlice({
   name: 'applications',
   initialState,
@@ -102,6 +110,10 @@ const applicationsSlice = createSlice({
       // Add application
       .addCase(addApplication.fulfilled, (state, action) => {
         state.applications.unshift(action.payload);
+      })
+      // Delete application
+      .addCase(deleteApplication.fulfilled, (state, action) => {
+        state.applications = state.applications.filter(app => app.id !== action.payload);
       });
   },
 });

@@ -11,7 +11,7 @@ def get_db():
 async def get_statistics(db: DatabaseManager = Depends(get_db)):
     """Get application statistics"""
     try:
-        stats = db.get_statistics()
+        stats = await db.get_statistics()
         return stats
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving statistics: {str(e)}")

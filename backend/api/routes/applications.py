@@ -103,3 +103,21 @@ async def add_manual_application(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error adding application: {str(e)}")
+
+@router.delete("/{application_id}")
+async def delete_application(
+    application_id: int,
+    db: DatabaseManager = Depends(get_db)
+):
+    """Delete job application"""
+    try:
+        success = await db.delete_application(application_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Application not found")
+            
+        return {"message": "Application deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting application: {str(e)}")

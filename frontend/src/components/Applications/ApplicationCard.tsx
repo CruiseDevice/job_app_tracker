@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { ExternalLink, Calendar, MapPin, DollarSign, Clock, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import type { JobApplication, ApplicationStatus } from '../../types/application';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
-import { updateApplicationStatus } from '../../store/slices/applicationsSlice';
+import { updateApplicationStatus, deleteApplication } from '../../store/slices/applicationsSlice';
 import StatusBadge from './StatusBadge';
 
 interface ApplicationCardProps {
@@ -15,6 +15,8 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
   const dispatch = useAppDispatch();
   const [showActions, setShowActions] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -61,9 +63,25 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
   };
 
   const handleDelete = () => {
-    // TODO: Show delete confirmation
-    console.log('Delete application', application.id);
+    setShowDeleteConfirm(true);
     setShowActions(false);
+  };
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await dispatch(deleteApplication(application.id)).unwrap();
+    } catch (error) {
+      console.error('Error deleting application:', error);
+      // TODO: Show error toast
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
   };
 
   const statusOptions: ApplicationStatus[] = ['applied', 'interview', 'assessment', 'rejected', 'offer'];
@@ -214,6 +232,36 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Delete Application
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete your application to <strong>{application.company}</strong> for the <strong>{application.position}</strong> position? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={cancelDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

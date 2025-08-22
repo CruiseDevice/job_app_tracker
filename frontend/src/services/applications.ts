@@ -31,6 +31,11 @@ export const applicationsApi = {
     return response.data;
   },
 
+  // Delete application
+  deleteApplication: async (id: number): Promise<void> => {
+    await api.delete(`/applications/${id}`);
+  },
+
   // Get statistics
   getStatistics: async (): Promise<ApplicationStats> => {
     const response = await api.get('/statistics');
