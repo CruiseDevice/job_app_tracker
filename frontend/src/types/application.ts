@@ -22,7 +22,8 @@ export interface JobApplication {
     | "interview" 
     | "assessment" 
     | "rejected" 
-    | "offer";
+    | "offer"
+    | "screening";
   
   export interface ApplicationFilters {
     status?: ApplicationStatus;

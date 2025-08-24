@@ -19,7 +19,7 @@ const EditApplicationModal: React.FC<EditApplicationModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const statusOptions: ApplicationStatus[] = ['applied', 'interview', 'assessment', 'rejected', 'offer'];
+  const statusOptions: ApplicationStatus[] = ['applied', 'interview', 'assessment', 'rejected', 'offer', 'screening'];
 
   useEffect(() => {
     if (isOpen && application) {

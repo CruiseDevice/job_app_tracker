@@ -270,7 +270,7 @@ class DatabaseManager:
             
             # Get status distribution
             status_counts = {}
-            for status in ["applied", "interview", "offer", "rejected", "assessment"]:
+            for status in ["applied", "interview", "offer", "rejected", "assessment", "screening", "captured"]:
                 count = session.query(JobApplication).filter(
                     JobApplication.status == status
                 ).count()
@@ -785,7 +785,7 @@ class DatabaseManager:
             
             # Status distribution
             status_counts = {}
-            for status in ["applied", "interview", "offer", "rejected", "assessment", "captured"]:
+            for status in ["applied", "interview", "offer", "rejected", "assessment", "screening", "captured"]:
                 count = session.query(JobApplication).filter(JobApplication.status == status).count()
                 status_counts[status] = count
 

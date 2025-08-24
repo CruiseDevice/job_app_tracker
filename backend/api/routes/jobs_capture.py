@@ -2,19 +2,84 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request, Depends
 import logging
 import json
+import re
+import os
 from datetime import datetime
 from pydantic import BaseModel, field_validator
 
 from database.database_manager import DatabaseManager
 from services.websocket_manager import manager as websocket_manager
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Initialize OpenAI client
+try:
+    openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+except Exception as e:
+    logger.warning(f"OpenAI client initialization failed: {e}")
+    openai_client = None
+
 
 def get_db():
     return DatabaseManager()
+
+
+async def extract_salary_from_description(job_description: str) -> Optional[str]:
+    """
+    Extract salary information from job description using LLM
+    
+    Args:
+        job_description: The job description text
+        
+    Returns:
+        Extracted salary range as string, or None if no salary found
+    """
+    if not openai_client or not job_description or len(job_description.strip()) < 50:
+        return None
+        
+    try:
+        prompt = f"""
+Extract the salary or compensation information from the following job description. 
+
+Job Description:
+{job_description}
+
+Instructions:
+- Look for salary ranges, hourly rates, annual compensation, etc.
+- Include currency symbols and time periods (e.g., "$80,000 - $100,000 per year", "$50/hour")
+- If no specific salary is mentioned, look for compensation ranges or levels
+- If no salary information is found, respond with "Not specified"
+- Be concise and extract only the relevant salary information
+
+Respond with just the salary information, nothing else.
+"""
+
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that extracts salary information from job descriptions. Respond only with the salary information or 'Not specified'."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=50,
+            temperature=0.2
+        )
+        
+        salary_info = response.choices[0].message.content.strip()
+        
+        # Clean up the response
+        if salary_info and salary_info.lower() not in ['not specified', 'none', 'n/a', '']:
+            logger.info(f"💰 Extracted salary: {salary_info}")
+            return salary_info
+        else:
+            logger.debug("💰 No salary information found in job description")
+            return None
+            
+    except Exception as e:
+        logger.error(f"❌ Error extracting salary from description: {e}")
+        return None
 
 
 # Pydantic models for request validation
@@ -104,6 +169,14 @@ async def capture_job_data(
         user_agent = request.headers.get("user-agent", "unknown")
         logger.debug(f"📡 Request from {client_host}, User-Agent: {user_agent}")
 
+        # Extract salary from job description if not provided and description exists
+        salary_range = job_request.salary_range
+        if not salary_range and job_request.job_description:
+            logger.info("💰 Attempting to extract salary from job description...")
+            extracted_salary = await extract_salary_from_description(job_request.job_description)
+            if extracted_salary:
+                salary_range = extracted_salary
+
         # prepare application data for database
         application_data = {
             "company": job_request.company,
@@ -111,8 +184,8 @@ async def capture_job_data(
             "job_url": job_request.job_url,
             "location": job_request.location,
             "job_description": job_request.job_description,
-            "salary_range": job_request.salary_range,
-            "status": "captured",  # Special status for extension-captured jobs
+            "salary_range": salary_range,
+            "status": "applied",  # Extension-captured jobs are considered as applied
             "application_date": datetime.now(),  # Use current time as capture time
             "notes": f"Captured via browser extension from {job_request.job_board}",
             

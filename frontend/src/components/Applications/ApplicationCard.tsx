@@ -105,7 +105,7 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
     setShowDeleteConfirm(false);
   };
 
-  const statusOptions: ApplicationStatus[] = ['applied', 'interview', 'assessment', 'rejected', 'offer'];
+  const statusOptions: ApplicationStatus[] = ['applied', 'interview', 'assessment', 'rejected', 'offer', 'screening'];
 
   return (
     <div className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200 overflow-hidden">
