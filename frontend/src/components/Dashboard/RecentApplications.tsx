@@ -39,7 +39,8 @@ const RecentApplications: React.FC<RecentApplicationsProps> = ({
 
   const getTimeAgo = (dateString: string) => {
     const now = new Date();
-    const date = new Date(dateString);
+    // Treat the dateString as UTC if no timezone is specified
+    const date = new Date(dateString + (dateString.includes('Z') || dateString.includes('+') ? '' : 'Z'));
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
     if (diffInHours < 1) {

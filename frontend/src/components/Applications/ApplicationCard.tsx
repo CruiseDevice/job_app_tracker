@@ -30,8 +30,19 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
 
   const getTimeAgo = (dateString: string) => {
     const now = new Date();
-    const date = new Date(dateString);
+    // Treat the dateString as UTC if no timezone is specified
+    const adjustedDateString = dateString + (dateString.includes('Z') || dateString.includes('+') ? '' : 'Z');
+    const date = new Date(adjustedDateString);
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    // Debug logging
+    console.log('getTimeAgo FIXED debug:', {
+      original: dateString,
+      adjusted: adjustedDateString,
+      now: now.toISOString(),
+      date: date.toISOString(),
+      diffInHours
+    });
     
     if (diffInHours < 1) {
       return 'Just now';
@@ -168,11 +179,6 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
                 background: 'transparent'
               }}
             >
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </option>
-              ))}
             </select>
             <StatusBadge status={application.status} />
           </div>

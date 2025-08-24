@@ -1,0 +1,70 @@
+<html>
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Smart Job tracker</title>
+      <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <div class="container">
+      
+      <!-- header -->
+      <div class="header">
+        <h1>Job Tracker</h1>
+        <div class="status" id="connectionStatus">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Checking...</span>
+        </div>
+      </div>
+      
+      <!-- main content -->
+      <div class="content">
+        
+        <!-- current page info -->
+        <div class="page-info">
+          <h3>Current Page</h3>
+          <div class="page-status" id="pageStatus">
+            <span id="pageType">Analyzing...</span>
+          </div>
+        </div>
+
+        <!-- action buttons -->
+        <div class="actions">
+          <button id="captureBtn" class="btn btn-primary" disabled>
+            <span class="btn-icon">📋</span>
+            <span class="btn-text">Capture Job</span>
+            <span class="loading" id="captureLoading"></span>
+          </button>
+          <button id="openDashboard" class="btn btn-secondary">
+            <span class="btn-icon">🏠</span>
+            <span class="btn-text">Open Dashboard</span>
+          </button>
+        </div> 
+
+        <!-- last capture info -->
+        <div class="last-capture" id="lastCapture" style="display: none;">
+          <h4>Last Captured</h4>
+          <div class="capture-info">
+            <div class="company" id="lastCompany"></div>
+            <div class="position" id="lastPosition"></div>
+            <div class="timestamp" id="lastTimestamp"></div>
+          </div>
+        </div>
+
+        <!-- message/errors -->
+        <div class="message" id="messageArea" style="display: none;">
+          <div class="message-text" id="messageText"></div>
+        </div>
+      </div>
+
+      <!-- footer -->
+      <div class="footer">
+        <div class="stats">
+          <span id="todayCount">0</span> captured today
+        </div>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
