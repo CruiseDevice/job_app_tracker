@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "sqlite:///./database.db"
+    database_url: str = "sqlite:///../database.db"
     
     # API Settings
     api_host: str = "127.0.0.1"
