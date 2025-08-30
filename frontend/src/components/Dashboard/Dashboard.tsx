@@ -103,6 +103,7 @@ const Dashboard: React.FC = () => {
                           className={`h-2 rounded-full ${
                             status === 'applied' ? 'bg-blue-500' :
                             status === 'interview' ? 'bg-yellow-500' :
+                            status === 'screening' ? 'bg-teal-500' :
                             status === 'assessment' ? 'bg-purple-500' :
                             status === 'rejected' ? 'bg-red-500' :
                             'bg-green-500'

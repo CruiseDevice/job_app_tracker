@@ -12,7 +12,7 @@ const ApplicationFilters: React.FC<ApplicationFiltersProps> = ({
   filters,
   onChange
 }) => {
-  const statuses: ApplicationStatus[] = ['applied', 'interview', 'assessment', 'rejected', 'offer'];
+  const statuses: ApplicationStatus[] = ['applied', 'interview', 'assessment', 'rejected', 'offer', 'screening'];
 
   const handleStatusChange = (status: ApplicationStatus) => {
     onChange({

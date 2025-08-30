@@ -95,6 +95,45 @@ class DatabaseManager:
         finally:
             session.close()
 
+    def search_applications_by_company_and_position(self, company: str, position: str = None, 
+                                                  days_back: int = 45) -> List[Dict[str, Any]]:
+        """
+        Search for applications by company name and optionally position
+        
+        Args:
+            company: Company name to search for
+            position: Optional position title
+            days_back: How many days back to search
+            
+        Returns:
+            List of matching applications
+        """
+        session = self.get_session()
+        try:
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+            
+            query = session.query(JobApplication).filter(
+                JobApplication.application_date >= cutoff_date
+            )
+            
+            # Add company filter (case-insensitive)
+            if company:
+                query = query.filter(JobApplication.company.ilike(f'%{company}%'))
+            
+            # Add position filter if provided
+            if position:
+                query = query.filter(JobApplication.position.ilike(f'%{position}%'))
+            
+            applications = query.order_by(JobApplication.application_date.desc()).all()
+            
+            return [app.to_dict() for app in applications]
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error searching applications: {e}")
+            return []
+        finally:
+            session.close()
+
     def get_applications(
         self, 
         skip: int = 0, 
@@ -153,6 +192,31 @@ class DatabaseManager:
         """Get jobs captured via email monitoring"""  
         return self.get_applications(source_type="email", limit=limit)
 
+    async def get_applications_since(self, cutoff_date: datetime) -> List[JobApplication]:
+        """
+        Get all job applications since a specific date
+        
+        Args:
+            cutoff_date: Only return applications after this date
+            
+        Returns:
+            List of JobApplication objects
+        """
+        session = self.get_session()
+        try:
+            applications = session.query(JobApplication).filter(
+                JobApplication.application_date >= cutoff_date
+            ).order_by(JobApplication.application_date.desc()).all()
+            
+            logger.debug(f"Found {len(applications)} applications since {cutoff_date}")
+            return applications
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting applications since {cutoff_date}: {e}")
+            return []
+        finally:
+            session.close()
+
     def get_application(self, application_id: int) -> Optional[JobApplication]:
         """Get single application by ID"""
         session = self.get_session()
@@ -166,9 +230,42 @@ class DatabaseManager:
             return None
         finally:
             session.close()
+    
+    def get_application_by_id(self, application_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get a single job application by ID
+        
+        Args:
+            application_id: ID of the application
+            
+        Returns:
+            Application dict or None if not found
+        """
+        session = self.get_session()
+        try:
+            application = session.query(JobApplication).filter(
+                JobApplication.id == application_id
+            ).first()
+            
+            return application.to_dict() if application else None
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting application {application_id}: {e}")
+            return None
+        finally:
+            session.close()
 
-    async def update_application_status(self, application_id: int, status: str) -> Optional[Dict[str, Any]]:
-        """Update application status and return updated application data"""
+    async def update_application_notes(self, application_id: int, notes: str) -> bool:
+        """
+        Update the notes field for a job application
+        
+        Args:
+            application_id: ID of the application to update
+            notes: New notes content
+            
+        Returns:
+            True if successful, False otherwise
+        """
         session = self.get_session()
         try:
             application = session.query(JobApplication).filter(
@@ -176,16 +273,61 @@ class DatabaseManager:
             ).first()
             
             if application:
-                application.status = status
+                application.notes = notes
                 application.updated_at = datetime.now()
                 session.commit()
-                session.refresh(application)
-                logger.info(f"Updated application {application_id} status to {status}")
                 
-                # Return the updated application data
-                return application.to_dict()
-            return None
+                logger.info(f"📝 Updated notes for application {application_id}")
+                return True
+            else:
+                logger.warning(f"⚠️ Application {application_id} not found for notes update")
+                return False
+                
+        except SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Error updating application notes: {e}")
+            return False
+        finally:
+            session.close()
+
+    async def update_application_status(self, application_id: int, new_status: str) -> Optional[Dict[str, Any]]:
+        """
+        Update application status and return updated application
+        
+        Args:
+            application_id: ID of application to update
+            new_status: New status value
             
+        Returns:
+            Updated application dict or None if not found
+        """
+        session = self.get_session()
+        try:
+            application = session.query(JobApplication).filter(
+                JobApplication.id == application_id
+            ).first()
+            
+            if application:
+                old_status = application.status
+                application.status = new_status
+                application.updated_at = datetime.now()
+                
+                # Update status-specific dates
+                if new_status == 'interview' and not application.interview_date:
+                    application.interview_date = datetime.now()
+                elif new_status in ['offer', 'accepted']:
+                    application.offer_date = datetime.now()
+                elif new_status == 'rejected':
+                    application.rejection_date = datetime.now()
+                
+                session.commit()
+                
+                logger.info(f"📝 Updated application {application_id}: {old_status} -> {new_status}")
+                return application.to_dict()
+            else:
+                logger.warning(f"⚠️ Application {application_id} not found")
+                return None
+                
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(f"Error updating application status: {e}")
@@ -270,7 +412,7 @@ class DatabaseManager:
             
             # Get status distribution
             status_counts = {}
-            for status in ["applied", "interview", "offer", "rejected", "assessment"]:
+            for status in ["applied", "interview", "offer", "rejected", "assessment", "screening", "captured"]:
                 count = session.query(JobApplication).filter(
                     JobApplication.status == status
                 ).count()
@@ -420,20 +562,52 @@ class DatabaseManager:
             logger.error(f"Error closing database connections: {e}")
 
 
-    def create_email_job_link(self, link_data: Dict[str, Any]) -> int:
-        """Create a new email-job link"""
+    async def create_email_job_link(self, link_data: Dict[str, Any]) -> Optional[int]:
+        """
+        Create a new email-job link
+        
+        Args:
+            link_data: Dictionary containing link information
+            
+        Returns:
+            Link ID if successful, None otherwise
+        """
         session = self.get_session()
         try:
-            link = EmailJobLink(**link_data)
+            # Check if link already exists
+            existing_link = session.query(EmailJobLink).filter(
+                EmailJobLink.email_id == link_data['email_id'],
+                EmailJobLink.job_id == link_data['job_id']
+            ).first()
+            
+            if existing_link:
+                logger.debug(f"Link already exists: Email {link_data['email_id']} -> Job {link_data['job_id']}")
+                return existing_link.id
+            
+            # Create new link
+            link = EmailJobLink(
+                email_id=link_data['email_id'],
+                job_id=link_data['job_id'],
+                confidence_score=link_data.get('confidence_score', 0.0),
+                match_methods=link_data.get('match_methods', '[]'),
+                match_details=link_data.get('match_details', '{}'),
+                match_explanation=link_data.get('match_explanation', ''),
+                link_type=link_data.get('link_type', 'automatic'),
+                created_by=link_data.get('created_by', 'system'),
+                is_verified=link_data.get('is_verified', False),
+                is_rejected=link_data.get('is_rejected', False)
+            )
+            
             session.add(link)
             session.commit()
-            session.refresh(link)
-            logger.info(f"Created email-job link: {link_data['email_id']} ↔ job {link_data['job_id']}")
+            
+            logger.info(f"🔗 Created email-job link: Email {link_data['email_id']} -> Job {link_data['job_id']}")
             return link.id
+            
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(f"Error creating email-job link: {e}")
-            raise
+            return None
         finally:
             session.close()
 
@@ -506,6 +680,31 @@ class DatabaseManager:
             
         except SQLAlchemyError as e:
             logger.error(f"Error getting email-job links: {e}")
+            return []
+        finally:
+            session.close()
+
+    async def get_email_job_links_for_application(self, job_id: int) -> List[Dict[str, Any]]:
+        """
+        Get all email links for a specific job application
+        
+        Args:
+            job_id: Job application ID
+            
+        Returns:
+            List of email-job links
+        """
+        session = self.get_session()
+        try:
+            links = session.query(EmailJobLink).filter(
+                EmailJobLink.job_id == job_id,
+                EmailJobLink.is_rejected == False
+            ).order_by(EmailJobLink.created_at.desc()).all()
+            
+            return [link.to_dict() for link in links]
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting email links for job {job_id}: {e}")
             return []
         finally:
             session.close()
@@ -647,6 +846,72 @@ class DatabaseManager:
         finally:
             session.close()
 
+    def get_unlinked_emails_count(self) -> int:
+        """
+        Get count of job-related emails that aren't linked to applications
+        
+        Returns:
+            Number of unlinked emails
+        """
+        session = self.get_session()
+        try:
+            # This would require an emails table to work properly
+            # For now, return 0 as placeholder
+            return 0
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting unlinked emails count: {e}")
+            return 0
+        finally:
+            session.close()
+
+    def get_duplicate_applications(self) -> List[Dict[str, Any]]:
+        """
+        Find potential duplicate applications (same company + position)
+        
+        Returns:
+            List of potential duplicates grouped by company+position
+        """
+        session = self.get_session()
+        try:
+            from sqlalchemy import func
+            
+            # Find applications with same company and position
+            duplicates = session.query(
+                JobApplication.company,
+                JobApplication.position,
+                func.count(JobApplication.id).label('count'),
+                func.group_concat(JobApplication.id).label('ids')
+            ).group_by(
+                JobApplication.company, 
+                JobApplication.position
+            ).having(
+                func.count(JobApplication.id) > 1
+            ).all()
+            
+            duplicate_groups = []
+            for dup in duplicates:
+                if dup.count > 1:
+                    ids = [int(id_str) for id_str in dup.ids.split(',')]
+                    apps = session.query(JobApplication).filter(
+                        JobApplication.id.in_(ids)
+                    ).all()
+                    
+                    duplicate_groups.append({
+                        'company': dup.company,
+                        'position': dup.position,
+                        'count': dup.count,
+                        'applications': [app.to_dict() for app in apps]
+                    })
+            
+            return duplicate_groups
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error finding duplicate applications: {e}")
+            return []
+        finally:
+            session.close()
+
     def get_unmatched_emails(self, limit: int = 100) -> List[EmailRecord]:
         """Get emails that don't have matches yet"""
         session = self.get_session()
@@ -785,7 +1050,7 @@ class DatabaseManager:
             
             # Status distribution
             status_counts = {}
-            for status in ["applied", "interview", "offer", "rejected", "assessment", "captured"]:
+            for status in ["applied", "interview", "offer", "rejected", "assessment", "screening", "captured"]:
                 count = session.query(JobApplication).filter(JobApplication.status == status).count()
                 status_counts[status] = count
 

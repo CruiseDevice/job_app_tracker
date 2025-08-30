@@ -62,7 +62,7 @@ async def update_application(
     try:
         # Validate status if provided
         if "status" in application_data:
-            valid_statuses = ["applied", "interview", "assessment", "rejected", "offer"]
+            valid_statuses = ["applied", "interview", "assessment", "rejected", "offer", "screening", "captured"]
             if application_data["status"] not in valid_statuses:
                 raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
 
@@ -89,7 +89,7 @@ async def update_application_status(
         if not status:
             raise HTTPException(status_code=400, detail="Status is required")
             
-        valid_statuses = ["applied", "interview", "assessment", "rejected", "offer"]
+        valid_statuses = ["applied", "interview", "assessment", "rejected", "offer", "screening", "captured"]
         if status not in valid_statuses:
             raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
         

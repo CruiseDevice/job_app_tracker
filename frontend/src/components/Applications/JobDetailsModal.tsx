@@ -258,9 +258,10 @@ const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      application.status === 'captured' ? 'bg-blue-100 text-blue-800' :
                       application.status === 'applied' ? 'bg-green-100 text-green-800' :
                       application.status === 'interview' ? 'bg-yellow-100 text-yellow-800' :
+                      application.status === 'screening' ? 'bg-teal-100 text-teal-800' :
+                      application.status === 'assessment' ? 'bg-orange-100 text-orange-800' :
                       application.status === 'offer' ? 'bg-purple-100 text-purple-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>

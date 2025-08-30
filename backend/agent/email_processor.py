@@ -26,15 +26,16 @@ class EmailProcessor:
         self.imap_port = 993
         self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
-        # Job-related keywords for initial filtering (privacy protection)
+        # Follow-up specific keywords for initial filtering (privacy protection)
+        # Only looking for interview, assessment, or screening follow-ups
         self.JOB_KEYWORDS = [
-            'application', 'interview', 'position', 'role', 'job', 'career',
-            'hiring', 'recruitment', 'hr', 'human resources', 'talent',
-            'opportunity', 'opening', 'vacancy', 'candidate', 'resume',
-            'cv', 'application received', 'thank you for applying',
-            'next steps', 'assessment', 'screening', 'offer', 'compensation',
-            'schedule', 'scheduling', 'interview invitation', 'phone screen',
-            'video call', 'meeting', 'time slot', 'available times'
+            'interview', 'next steps', 'assessment', 'screening', 'phone screen',
+            'video call', 'follow up', 'follow-up', 'next round', 'second interview',
+            'technical interview', 'coding challenge', 'test results', 'assessment results',
+            'interview feedback', 'moving forward', 'next stage', 'congratulations',
+            'technical test', 'coding test', 'take home', 'homework assignment',
+            'panel interview', 'final interview', 'onsite interview', 'virtual interview',
+            'interview scheduled', 'interview confirmation', 'interview reminder'
         ]
         
         # Email domains that commonly send job-related emails
@@ -330,11 +331,18 @@ Body:
 {email_data.get('body', '')[:2000]}  # Limit to first 2000 chars
 """
 
-            # LLM prompt for job application analysis
+            # LLM prompt for job application analysis - tracking follow-ups and offers
             prompt = """
-You are an AI assistant that analyzes emails to detect job applications and extract relevant details.
+You are an AI assistant that analyzes emails to detect specific types of job-related communications.
 
-Analyze the following email and determine if it's related to a job application. If it is, extract the relevant information.
+IMPORTANT: Track emails that are FOLLOW-UPS related to interviews, assessments, screening calls, OR job offers. 
+DO NOT track general job applications, confirmations, or recruiter outreach emails.
+
+Analyze the following email and determine if it fits these SPECIFIC criteria:
+1. Interview follow-up emails (scheduling, confirmations, next steps after interview)
+2. Assessment follow-up emails (test results, next steps after assessment) 
+3. Screening call follow-up emails (next steps after phone/video screening)
+4. Job offer emails (formal offers, offer letters, compensation details)
 
 Email to analyze:
 {email_content}
@@ -345,39 +353,40 @@ Return your response in JSON format with the following structure:
     "company": "Company name",
     "position": "Job title/position",
     "location": "Job location (if mentioned)",
-    "status": "applied/interview/offer/rejected/assessment",
-    "description": "Brief job description (if available)",
+    "status": "interview/assessment/screening/offer",
+    "description": "Brief description of the follow-up or offer",
     "salary": "Salary range (if mentioned)",
     "job_url": "Job posting URL (if available)",
-    "application_date": "Date applied (YYYY-MM-DD format)",
-    "notes": "Any additional relevant information"
+    "application_date": "Date of original application (YYYY-MM-DD format)",
+    "notes": "Additional relevant information about the follow-up or offer details"
 }}
 
-Only return valid JSON. If it's not a job application email, set "is_job_application" to false.
+Only return valid JSON. If it's not a follow-up email for interview/assessment/screening or an offer, set "is_job_application" to false.
 
-Guidelines:
-- Look for confirmation emails after submitting applications
-- Interview scheduling emails (use status "interview")
-- Job assessment or test invitations (use status "assessment")
-- Offer letters (use status "offer")
-- Rejection emails (use status "rejected")
-- Recruiter outreach emails
-- Application status updates
+STRICT Guidelines - ONLY track these:
+- Interview follow-up: Emails about interview results, next interview rounds, interview feedback
+- Assessment follow-up: Emails about technical test results, coding challenge outcomes, next steps after assessment
+- Screening follow-up: Emails about phone/video screening results, moving to next stage after screening
+- Offer emails: Job offers, offer letters, compensation packages, salary negotiations
 
-Status mapping:
-- "applied": Initial applications or confirmations
-- "interview": Interview invitations, scheduling, or related communications
-- "assessment": Technical tests, coding challenges, or assessments
-- "offer": Job offers or offer-related communications
-- "rejected": Rejection notifications
+DO NOT track:
+- Initial job applications or confirmations
+- General recruiter outreach
+- Job postings or opportunities
+- Rejection emails (unless they're follow-ups to interviews/assessments)
+
+Status mapping (ONLY these four):
+- "interview": Follow-ups related to interviews (scheduling next round, interview feedback, etc.)
+- "assessment": Follow-ups related to assessments/tests (results, next steps after test)
+- "screening": Follow-ups related to screening calls (moving forward after phone screen)
+- "offer": Job offers, offer letters, compensation discussions
 
 IMPORTANT for job position extraction:
 - If the email doesn't specify a job title, try to infer from context
-- For SimplyHired/job board confirmations, look in subject line or body for position hints
 - If no position can be determined, use "Position Not Specified" as the value
 - Never leave the position field empty or null
 
-Be accurate and only extract information that's clearly stated in the email.
+Be very strict - only extract emails that are clearly follow-ups to interviews, assessments, or screening calls.
 """.format(email_content=email_content)
 
             # Call LLM API
@@ -420,10 +429,17 @@ Be accurate and only extract information that's clearly stated in the email.
             if not position or position.lower() in ['none', 'null', '']:
                 position = 'Position Not Specified'
             
+            # Validate status - only allow specific follow-up types
+            status = result.get('status', '')
+            valid_statuses = ['interview', 'assessment', 'screening']
+            if status not in valid_statuses:
+                logger.debug(f"🚫 Invalid status '{status}' - not a valid follow-up type")
+                return None
+            
             application_data = {
                 'company': result.get('company', 'Unknown'),
                 'position': position,
-                'status': result.get('status', 'applied'),
+                'status': status,
                 'application_date': app_date,
                 'job_description': result.get('description', ''),
                 'location': result.get('location', ''),
@@ -447,7 +463,7 @@ Be accurate and only extract information that's clearly stated in the email.
             logger.error(f"❌ Error in LLM analysis: {e}")
             return None
 
-    async def test_email_processing(self, test_email_id: str) -> Dict[str, Any]:
+    async def test_email_processing(self) -> Dict[str, Any]:
         """Test email processing with a specific email ID"""
         try:
             # For IMAP, we can't easily fetch by ID, so we'll fetch recent emails instead
