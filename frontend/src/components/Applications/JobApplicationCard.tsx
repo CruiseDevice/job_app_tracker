@@ -120,14 +120,14 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
         <div className="flex items-center gap-1 mb-2">
           <span className="text-xs font-medium text-gray-500">PROGRESS</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-6 gap-1 mb-2">
           {STATUS_PROGRESSION.map((status, index) => {
             const currentIndex = STATUS_PROGRESSION.indexOf(application.status);
             const isActive = index <= currentIndex;
             const isCurrent = status === application.status;
             
             return (
-              <div key={status} className="flex items-center">
+              <div key={status} className="flex flex-col items-center">
                 <div className={`w-2 h-2 rounded-full ${
                   isCurrent 
                     ? 'bg-blue-500 ring-2 ring-blue-200' 
@@ -135,20 +135,30 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
                       ? 'bg-green-500' 
                       : 'bg-gray-300'
                 }`} />
-                {index < STATUS_PROGRESSION.length - 1 && (
-                  <div className={`w-8 h-px ${isActive ? 'bg-green-300' : 'bg-gray-200'}`} />
-                )}
               </div>
             );
           })}
         </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>Captured</span>
-          <span>Applied</span>
-          <span>Assessment</span>
-          <span>Interview</span>
-          <span>Offer</span>
-          <span>Accepted</span>
+        
+        {/* Connecting lines as a separate layer */}
+        <div className="flex items-center justify-between mb-2 -mt-3">
+          {STATUS_PROGRESSION.map((status, index) => {
+            const currentIndex = STATUS_PROGRESSION.indexOf(application.status);
+            const isActive = index <= currentIndex;
+            
+            return index < STATUS_PROGRESSION.length - 1 ? (
+              <div key={index} className={`flex-1 h-px ${isActive ? 'bg-green-300' : 'bg-gray-200'} mx-1`} />
+            ) : null;
+          })}
+        </div>
+        
+        <div className="grid grid-cols-6 gap-1 text-xs text-gray-500 mt-1">
+          <span className="text-center leading-tight transform -rotate-12">Captured</span>
+          <span className="text-center leading-tight transform -rotate-12">Applied</span>
+          <span className="text-center leading-tight transform -rotate-12">Assessment</span>
+          <span className="text-center leading-tight transform -rotate-12">Interview</span>
+          <span className="text-center leading-tight transform -rotate-12">Offer</span>
+          <span className="text-center leading-tight transform -rotate-12">Accepted</span>
         </div>
       </div>
 
