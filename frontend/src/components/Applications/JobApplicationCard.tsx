@@ -77,7 +77,7 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
@@ -94,25 +94,31 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
         </div>
       </div>
 
-      {/* Details */}
-      <div className="space-y-2 mb-4">
-        {application.location && (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <MapPin className="w-4 h-4" />
-            <span>{application.location}</span>
-          </div>
-        )}
-        
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Calendar className="w-4 h-4" />
-          <span>Applied: {formatDate(application.application_date)}</span>
-        </div>
+      {/* Details - Fixed height section */}
+      <div className="mb-4 min-h-[80px]">
+        <div className="space-y-2">
+          {application.location && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <MapPin className="w-4 h-4" />
+              <span>{application.location}</span>
+            </div>
+          )}
 
-        {application.salary_range && (
-          <div className="text-sm text-gray-600">
-            <strong>Salary:</strong> {application.salary_range}
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Calendar className="w-4 h-4" />
+            <span>Applied: {formatDate(application.application_date)}</span>
           </div>
-        )}
+
+          {application.salary_range ? (
+            <div className="text-sm text-gray-600">
+              <strong>Salary:</strong> {application.salary_range}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-400">
+              <strong>Salary:</strong> Not specified
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Status Progression Indicator */}
@@ -139,7 +145,7 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
             );
           })}
         </div>
-        
+
         {/* Connecting lines as a separate layer */}
         <div className="flex items-center justify-between mb-2 -mt-3">
           {STATUS_PROGRESSION.map((status, index) => {
@@ -162,123 +168,125 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        {!FINAL_STATUSES.includes(application.status) && (
-          <>
-            {/* Quick Next Status Button */}
-            {getNextStatus() && (
-              <button
-                onClick={() => onStatusUpdate(application.id, getNextStatus()!)}
-                disabled={isUpdating}
-                className="px-3 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:opacity-50"
-              >
-                Mark as {getNextStatus()?.charAt(0).toUpperCase() + getNextStatus()?.slice(1)}
-              </button>
-            )}
-            
-            {/* Custom Status Update */}
-            <button
-              onClick={() => setShowStatusUpdate(!showStatusUpdate)}
-              className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
-            >
-              Update Status
-            </button>
-          </>
-        )}
-        
-        {/* View History */}
-        <button
-          onClick={() => onViewHistory(application.id)}
-          className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
-        >
-          View Timeline
-        </button>
-        
-        {/* Job URL */}
-        {application.job_url && (
-          <a
-            href={application.job_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 inline-flex items-center gap-1"
-          >
-            <ExternalLink className="w-4 h-4" />
-            View Job
-          </a>
-        )}
-      </div>
+      {/* Actions - Push to bottom */}
+      <div className="mt-auto">
+        <div className="flex flex-wrap gap-2">
+          {!FINAL_STATUSES.includes(application.status) && (
+            <>
+              {/* Quick Next Status Button */}
+              {getNextStatus() && (
+                <button
+                  onClick={() => onStatusUpdate(application.id, getNextStatus()!)}
+                  disabled={isUpdating}
+                  className="px-3 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:opacity-50"
+                >
+                  Mark as {getNextStatus()?.charAt(0).toUpperCase() + getNextStatus()?.slice(1)}
+                </button>
+              )}
 
-      {/* Status Update Panel */}
-      {showStatusUpdate && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-md border">
-          <h4 className="font-medium text-gray-900 mb-3">Update Application Status</h4>
+              {/* Custom Status Update */}
+              <button
+                onClick={() => setShowStatusUpdate(!showStatusUpdate)}
+                className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
+              >
+                Update Status
+              </button>
+            </>
+          )}
+
+          {/* View History */}
+          <button
+            onClick={() => onViewHistory(application.id)}
+            className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
+          >
+            View Timeline
+          </button>
           
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                New Status
-              </label>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              >
-                {STATUS_PROGRESSION.map(status => (
-                  <option key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </option>
-                ))}
-                <option value="rejected">Rejected</option>
-                <option value="withdrawn">Withdrawn</option>
-              </select>
-            </div>
+          {/* Job URL */}
+          {application.job_url && (
+            <a
+              href={application.job_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 inline-flex items-center gap-1"
+            >
+              <ExternalLink className="w-4 h-4" />
+              View Job
+            </a>
+          )}
+        </div>
+
+        {/* Status Update Panel */}
+        {showStatusUpdate && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+            <h4 className="font-medium text-gray-900 mb-3">Update Application Status</h4>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes (Optional)
-              </label>
-              <textarea
-                value={updateNotes}
-                onChange={(e) => setUpdateNotes(e.target.value)}
-                placeholder="Add any notes about this status change..."
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                rows={2}
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <button
-                onClick={handleStatusUpdate}
-                disabled={isUpdating || selectedStatus === application.status}
-                className="px-4 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:opacity-50"
-              >
-                {isUpdating ? 'Updating...' : 'Update Status'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowStatusUpdate(false);
-                  setSelectedStatus(application.status);
-                  setUpdateNotes('');
-                }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
-              >
-                Cancel
-              </button>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Status
+                </label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                >
+                  {STATUS_PROGRESSION.map(status => (
+                    <option key={status} value={status}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </option>
+                  ))}
+                  <option value="rejected">Rejected</option>
+                  <option value="withdrawn">Withdrawn</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={updateNotes}
+                  onChange={(e) => setUpdateNotes(e.target.value)}
+                  placeholder="Add any notes about this status change..."
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleStatusUpdate}
+                  disabled={isUpdating || selectedStatus === application.status}
+                  className="px-4 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {isUpdating ? 'Updating...' : 'Update Status'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowStatusUpdate(false);
+                    setSelectedStatus(application.status);
+                    setUpdateNotes('');
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Recent Notes Preview */}
-      {application.notes && (
-        <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
-          <h5 className="text-sm font-medium text-blue-900 mb-1">Latest Notes:</h5>
-          <p className="text-sm text-blue-800 line-clamp-2">
-            {application.notes.split('\n').slice(-3).join('\n')}
-          </p>
-        </div>
-      )}
+        {/* Recent Notes Preview */}
+        {application.notes && (
+          <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+            <h5 className="text-sm font-medium text-blue-900 mb-1">Latest Notes:</h5>
+            <p className="text-sm text-blue-800 line-clamp-2">
+              {application.notes.split('\n').slice(-3).join('\n')}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
