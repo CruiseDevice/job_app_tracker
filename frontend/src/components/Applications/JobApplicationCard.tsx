@@ -1,8 +1,6 @@
-// frontend/src/components/Applications/JobApplicationCard.tsx
-
 import React, { useState } from 'react';
 import { Calendar, Mail, MapPin, ExternalLink, Clock, TrendingUp, AlertCircle } from 'lucide-react';
-import { JobApplication } from '../../types/application';
+import type { JobApplication } from '../../types/application';
 
 interface JobApplicationCardProps {
   application: JobApplication;
@@ -155,7 +153,7 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {!FINAL_STATUSES.includes(application.status) && (
           <>
             {/* Quick Next Status Button */}
