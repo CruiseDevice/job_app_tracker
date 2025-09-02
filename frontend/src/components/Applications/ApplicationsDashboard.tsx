@@ -1,10 +1,15 @@
 // frontend/src/components/Applications/ApplicationsDashboard.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, RotateCcw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Search, RotateCcw, AlertTriangle, X, FileText } from 'lucide-react';
 import { JobApplicationCard } from './JobApplicationCard';
 import { ApplicationTimeline } from './ApplicationTimeline';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch } from '../../hooks/useAppDispatch';
+import { useAppSelector } from '../../hooks/useAppSelector';
+import { fetchApplications } from '../../store/slices/applicationsSlice';
+import { fetchStatistics } from '../../store/slices/statisticsSlice';
+import type { JobApplication } from '../../types/application';
+import type { RootState } from '../../store';
 
 interface ApplicationsDashboardProps {
   onStatusUpdate?: (id: number, status: string, notes?: string) => void;
@@ -14,7 +19,8 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
   onStatusUpdate
 }) => {
   const dispatch = useAppDispatch();
-  const { applications, loading, statistics } = useAppSelector(state => state.applications);
+  const { applications, loading } = useAppSelector((state: RootState) => state.applications);
+  const { stats: statistics } = useAppSelector((state: RootState) => state.statistics);
   
   // Local state
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,23 +28,29 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
   const [sortBy, setSortBy] = useState('date');
   const [showTimeline, setShowTimeline] = useState(false);
   const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(null);
-  const [duplicatesFound, setDuplicatesFound] = useState<any[]>([]);
+  const [duplicatesFound, setDuplicatesFound] = useState<Array<{
+    company: string;
+    position: string;
+    count: number;
+    applications: JobApplication[];
+  }>>([]);
   const [showDuplicates, setShowDuplicates] = useState(false);
+
+  const loadApplications = React.useCallback(async () => {
+    try {
+      // Fetch applications with your existing Redux action
+      dispatch(fetchApplications());
+      dispatch(fetchStatistics());
+    } catch (error) {
+      console.error('Failed to load applications:', error);
+    }
+  }, [dispatch]);
 
   useEffect(() => {
     // Load applications and check for duplicates on mount
     loadApplications();
     checkForDuplicates();
-  }, []);
-
-  const loadApplications = async () => {
-    try {
-      // Fetch applications with your existing Redux action
-      // dispatch(fetchApplications());
-    } catch (error) {
-      console.error('Failed to load applications:', error);
-    }
-  };
+  }, [loadApplications]);
 
   const checkForDuplicates = async () => {
     try {
@@ -114,7 +126,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
 
   // Filter and sort applications
   const filteredApplications = applications
-    .filter(app => {
+    .filter((app: JobApplication) => {
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
@@ -126,13 +138,13 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
       }
       return true;
     })
-    .filter(app => {
+    .filter((app: JobApplication) => {
       // Status filter
       if (statusFilter === 'all') return true;
       if (statusFilter === 'active') return !['rejected', 'withdrawn', 'accepted'].includes(app.status);
       return app.status === statusFilter;
     })
-    .sort((a, b) => {
+    .sort((a: JobApplication, b: JobApplication) => {
       switch (sortBy) {
         case 'date':
           return new Date(b.application_date).getTime() - new Date(a.application_date).getTime();
@@ -208,7 +220,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
               </h4>
               
               <div className="space-y-2">
-                {group.applications.map((app: any) => (
+                {group.applications.map((app: JobApplication) => (
                   <div key={app.id} className="flex items-center justify-between p-2 bg-white rounded border">
                     <div className="text-sm">
                       <span className="font-medium">ID {app.id}</span>
@@ -222,8 +234,8 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
                     <button
                       onClick={() => {
                         const otherIds = group.applications
-                          .filter((other: any) => other.id !== app.id)
-                          .map((other: any) => other.id);
+                          .filter((other: JobApplication) => other.id !== app.id)
+                          .map((other: JobApplication) => other.id);
                         handleMergeDuplicates(app.id, otherIds);
                       }}
                       className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
@@ -329,7 +341,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredApplications.map(application => (
+          {filteredApplications.map((application: JobApplication) => (
             <JobApplicationCard
               key={application.id}
               application={application}
@@ -348,14 +360,15 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
           setShowTimeline(false);
           setSelectedApplicationId(null);
         }}
-        application={applications.find(app => app.id === selectedApplicationId)}
+        application={applications.find((app: JobApplication) => app.id === selectedApplicationId)}
       />
 
       {/* Success Messages for Email Matching */}
       <div className="fixed bottom-4 right-4 space-y-2">
         {/* These would be triggered by WebSocket events */}
         {/* Example success notification */}
-        {false && ( // Replace with actual notification state
+        {/* Replace with actual notification state when needed */}
+        {/* Example notification - uncomment and connect to real state when needed
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 shadow-lg">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
@@ -367,7 +380,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
               Interview email for "Software Engineer at Google" was automatically linked.
             </p>
           </div>
-        )}
+        */}
       </div>
     </div>
   );
