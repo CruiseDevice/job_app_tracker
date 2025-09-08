@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Calendar, Mail, MapPin, ExternalLink, Clock, TrendingUp, AlertCircle } from 'lucide-react';
+import { Calendar, Mail, MapPin, ExternalLink, Clock, TrendingUp, AlertCircle, Trash2 } from 'lucide-react';
 import type { JobApplication } from '../../types/application';
 
 interface JobApplicationCardProps {
   application: JobApplication;
   onStatusUpdate: (id: number, status: string, notes?: string) => void;
   onViewHistory: (id: number) => void;
+  onDelete: (id: number) => void;
 }
 
 const STATUS_COLORS = {
@@ -25,12 +26,15 @@ const FINAL_STATUSES = ['rejected', 'withdrawn', 'accepted'];
 export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
   application,
   onStatusUpdate,
-  onViewHistory
+  onViewHistory,
+  onDelete
 }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showStatusUpdate, setShowStatusUpdate] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(application.status);
   const [updateNotes, setUpdateNotes] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleStatusUpdate = async () => {
     if (selectedStatus === application.status) return;
@@ -44,6 +48,18 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
       console.error('Failed to update status:', error);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete(application.id);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('Failed to delete application:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -87,10 +103,21 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
           <p className="text-gray-600 font-medium">{application.company}</p>
         </div>
         
-        {/* Status Badge */}
-        <div className={`flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-medium ${STATUS_COLORS[application.status] || STATUS_COLORS.applied}`}>
-          {getStatusIcon(application.status)}
-          <span className="capitalize">{application.status}</span>
+        <div className="flex items-center gap-2">
+          {/* Status Badge */}
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-medium ${STATUS_COLORS[application.status] || STATUS_COLORS.applied}`}>
+            {getStatusIcon(application.status)}
+            <span className="capitalize">{application.status}</span>
+          </div>
+          
+          {/* Delete Button */}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+            title="Delete application"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -273,6 +300,33 @@ export const JobApplicationCard: React.FC<JobApplicationCardProps> = ({
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Panel */}
+        {showDeleteConfirm && (
+          <div className="mt-4 p-4 bg-red-50 rounded-md border border-red-200">
+            <h4 className="font-medium text-red-900 mb-2">Delete Application</h4>
+            <p className="text-sm text-red-700 mb-4">
+              Are you sure you want to delete this application for {application.position} at {application.company}? 
+              This action cannot be undone.
+            </p>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-500 text-white text-sm rounded-md hover:bg-red-600 disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}

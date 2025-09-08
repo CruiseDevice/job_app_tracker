@@ -98,6 +98,26 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
     setShowTimeline(true);
   };
 
+  const handleDeleteApplication = async (id: number) => {
+    try {
+      const response = await fetch(`/api/applications/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete application');
+      
+      const data = await response.json();
+      console.log(`✅ Application deleted: ${data.message}`);
+      
+      // Reload applications to reflect changes
+      loadApplications();
+      
+    } catch (error) {
+      console.error('Failed to delete application:', error);
+      alert('Failed to delete application. Please try again.');
+    }
+  };
+
   const handleMergeDuplicates = async (primaryId: number, duplicateIds: number[]) => {
     try {
       const response = await fetch('/api/applications/merge', {
@@ -347,6 +367,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
               application={application}
               onStatusUpdate={handleStatusUpdate}
               onViewHistory={handleViewHistory}
+              onDelete={handleDeleteApplication}
             />
           ))}
         </div>
