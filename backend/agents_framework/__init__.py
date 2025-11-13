@@ -33,7 +33,10 @@ from agents_framework.tools.web_tools import (
     URLTools,
     create_web_toolset,
 )
-from agents_framework.core.example_agent import JobAnalystAgent, create_job_analyst_agent
+# Example agent (for reference/testing)
+from agents_framework.core.example_agent import JobAnalystAgent as ExampleJobAnalystAgent, create_job_analyst_agent as create_example_job_analyst
+# Specialized agents
+from agents_framework.agents.email_analyst_agent import EmailAnalystAgent, create_email_analyst_agent
 
 __version__ = "0.1.0"
 
@@ -58,7 +61,10 @@ __all__ = [
     "WebScrapingTools",
     "URLTools",
     "create_web_toolset",
-    # Example Agent
-    "JobAnalystAgent",
-    "create_job_analyst_agent",
+    # Example Agent (for reference)
+    "ExampleJobAnalystAgent",
+    "create_example_job_analyst",
+    # Specialized Agents
+    "EmailAnalystAgent",
+    "create_email_analyst_agent",
 ]
