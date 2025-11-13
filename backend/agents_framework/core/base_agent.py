@@ -11,11 +11,10 @@ from datetime import datetime
 from abc import ABC, abstractmethod
 
 from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.tools import Tool
-from langchain.prompts import PromptTemplate
+from langchain_core.tools import tool, StructuredTool
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.language_models import BaseLanguageModel
+from langgraph.prebuilt import create_react_agent
 
 logger = logging.getLogger(__name__)
 
@@ -101,14 +100,14 @@ class BaseAgent(ABC):
         self.llm = self._initialize_llm()
 
         # Initialize tools
-        self.tools: List[Tool] = []
+        self.tools: List[Any] = []
         self._register_tools()
 
         # Initialize memory
         self.conversation_history: List[Union[HumanMessage, AIMessage, SystemMessage]] = []
 
-        # Initialize agent executor
-        self.agent_executor: Optional[AgentExecutor] = None
+        # Initialize agent executor (LangGraph compiled graph)
+        self.agent_executor = None
         self._initialize_agent()
 
         # Tracking
@@ -123,7 +122,6 @@ class BaseAgent(ABC):
         return ChatOpenAI(
             model=self.config.model,
             temperature=self.config.temperature,
-            model_kwargs={"response_format": {"type": "text"}},
         )
 
     @abstractmethod
@@ -150,67 +148,25 @@ class BaseAgent(ABC):
         return_direct: bool = False
     ) -> None:
         """Add a tool to the agent's toolkit"""
-        tool = Tool(
-            name=name,
-            func=func,
-            description=description,
-            return_direct=return_direct,
-        )
-        self.tools.append(tool)
+        # Create a tool using the @tool decorator
+        tool_func = tool(func)
+        # Override the name and description if they don't match
+        tool_func.name = name
+        tool_func.description = description
+        self.tools.append(tool_func)
         logger.debug(f"Tool '{name}' added to agent '{self.name}'")
 
     def _initialize_agent(self) -> None:
-        """Initialize the ReAct agent with tools"""
+        """Initialize the ReAct agent with tools using LangGraph"""
         if not self.tools:
             logger.warning(f"Agent '{self.name}' has no tools registered")
             return
 
-        # Create ReAct prompt template
-        template = '''Answer the following questions as best you can. You have access to the following tools:
-
-{tools}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Begin!
-
-Question: {input}
-Thought: {agent_scratchpad}'''
-
-        prompt = PromptTemplate(
-            template=template,
-            input_variables=["input", "agent_scratchpad"],
-            partial_variables={
-                "tools": "\n".join([f"{tool.name}: {tool.description}" for tool in self.tools]),
-                "tool_names": ", ".join([tool.name for tool in self.tools]),
-            },
-        )
-
-        # Create ReAct agent
-        agent = create_react_agent(
-            llm=self.llm,
+        # Create ReAct agent using LangGraph
+        # LangGraph's create_react_agent returns a compiled graph
+        self.agent_executor = create_react_agent(
+            model=self.llm,
             tools=self.tools,
-            prompt=prompt,
-        )
-
-        # Create agent executor
-        self.agent_executor = AgentExecutor(
-            agent=agent,
-            tools=self.tools,
-            verbose=self.config.verbose,
-            max_iterations=self.config.max_iterations,
-            max_execution_time=self.config.max_execution_time,
-            handle_parsing_errors=True,
-            return_intermediate_steps=True,
         )
 
     def add_message_to_memory(self, message: Union[HumanMessage, AIMessage, SystemMessage]) -> None:
@@ -281,9 +237,14 @@ Thought: {agent_scratchpad}'''
 
             # Run agent if executor is available
             if self.agent_executor:
-                result = await self.agent_executor.ainvoke({"input": enhanced_input})
-                output = result.get("output", "")
-                intermediate_steps = result.get("intermediate_steps", [])
+                result = await self.agent_executor.ainvoke({"messages": [HumanMessage(content=enhanced_input)]})
+                # LangGraph returns messages in the result
+                messages = result.get("messages", [])
+                if messages:
+                    output = messages[-1].content if hasattr(messages[-1], 'content') else str(messages[-1])
+                else:
+                    output = ""
+                intermediate_steps = []
             else:
                 # Fallback to direct LLM call if no tools
                 system_prompt = self.get_system_prompt()

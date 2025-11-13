@@ -10,7 +10,6 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
 from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)

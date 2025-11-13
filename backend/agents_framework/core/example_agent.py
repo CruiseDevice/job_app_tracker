@@ -8,8 +8,6 @@ This agent helps analyze job applications and provides insights.
 import logging
 from typing import List
 
-from langchain.tools import Tool
-
 from agents_framework.core.base_agent import BaseAgent, AgentConfig
 from agents_framework.memory.agent_memory import AgentMemoryManager
 

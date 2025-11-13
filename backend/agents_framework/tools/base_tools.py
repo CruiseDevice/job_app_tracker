@@ -9,7 +9,8 @@ from typing import Any, Dict, Optional, List
 from datetime import datetime
 import json
 
-from langchain.tools import Tool
+# Note: This module provides legacy Tool-based helpers
+# New agents should use the @tool decorator approach in base_agent.py
 
 logger = logging.getLogger(__name__)
 
