@@ -12,6 +12,13 @@ from dataclasses import dataclass, asdict
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
+# Import vector memory for semantic storage
+try:
+    from agents_framework.memory.vector_memory import VectorMemoryStore
+    VECTOR_MEMORY_AVAILABLE = True
+except ImportError:
+    VECTOR_MEMORY_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -147,16 +154,23 @@ class SemanticMemory:
     """
     Semantic memory using vector embeddings for long-term memory.
 
-    This will be used for storing and retrieving relevant past experiences,
-    decisions, and learned patterns.
+    This uses ChromaDB for actual vector storage and semantic search.
     """
 
-    def __init__(self, collection_name: str = "agent_memory"):
+    def __init__(self, collection_name: str = "agent_memory", persist_directory: str = "./data/chroma"):
         self.collection_name = collection_name
-        self.memory_store: List[Dict[str, Any]] = []  # Simplified for now
 
-        # TODO: Integrate with ChromaDB for actual vector storage
-        logger.info(f"Semantic memory '{collection_name}' initialized (simplified mode)")
+        # Initialize with VectorMemoryStore if available
+        if VECTOR_MEMORY_AVAILABLE:
+            self.vector_store = VectorMemoryStore(
+                collection_name=collection_name,
+                persist_directory=persist_directory
+            )
+            logger.info(f"Semantic memory '{collection_name}' initialized with ChromaDB")
+        else:
+            self.vector_store = None
+            self.memory_store: List[Dict[str, Any]] = []  # Fallback
+            logger.warning(f"Semantic memory '{collection_name}' using fallback mode (ChromaDB not available)")
 
     def store(
         self,
@@ -165,6 +179,13 @@ class SemanticMemory:
         category: str = "general"
     ) -> str:
         """Store a memory with semantic embeddings"""
+        # Use vector store if available
+        if self.vector_store:
+            meta = metadata or {}
+            meta["category"] = category
+            return self.vector_store.add(content, metadata=meta)
+
+        # Fallback to simple storage
         memory_id = f"mem_{len(self.memory_store)}_{datetime.now().timestamp()}"
 
         memory = {
@@ -186,10 +207,14 @@ class SemanticMemory:
         category: Optional[str] = None,
         limit: int = 5
     ) -> List[Dict[str, Any]]:
-        """Retrieve relevant memories based on query"""
-        # Simplified retrieval - just return recent memories
-        # TODO: Implement actual semantic search with embeddings
+        """Retrieve relevant memories based on query using semantic search"""
+        # Use vector store if available
+        if self.vector_store:
+            where = {"category": category} if category else None
+            results = self.vector_store.search(query, n_results=limit, where=where)
+            return results
 
+        # Fallback to simple retrieval
         results = self.memory_store
 
         # Filter by category if provided
@@ -202,6 +227,11 @@ class SemanticMemory:
 
     def clear_category(self, category: str) -> int:
         """Clear all memories in a category"""
+        # Use vector store if available
+        if self.vector_store:
+            return self.vector_store.delete_by_metadata({"category": category})
+
+        # Fallback
         original_count = len(self.memory_store)
         self.memory_store = [m for m in self.memory_store if m["category"] != category]
         removed = original_count - len(self.memory_store)
@@ -211,6 +241,11 @@ class SemanticMemory:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get memory statistics"""
+        # Use vector store if available
+        if self.vector_store:
+            return self.vector_store.get_stats()
+
+        # Fallback
         categories = {}
         for mem in self.memory_store:
             cat = mem["category"]
@@ -223,6 +258,8 @@ class SemanticMemory:
         }
 
     def __len__(self) -> int:
+        if self.vector_store:
+            return self.vector_store.count()
         return len(self.memory_store)
 
 

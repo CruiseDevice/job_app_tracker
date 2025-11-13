@@ -14,14 +14,25 @@ from agents_framework.memory.agent_memory import (
     SemanticMemory,
     AgentMemoryManager,
 )
+from agents_framework.memory.vector_memory import (
+    VectorMemoryStore,
+    RAGMemoryManager,
+)
 # Note: base_tools.py uses legacy Tool API and is not compatible with LangGraph
-# from agents_framework.tools.base_tools import (
-#     DatabaseTools,
-#     EmailTools,
-#     AnalyticsTools,
-#     UtilityTools,
-#     create_standard_toolset,
-# )
+# Keep for backward compatibility but new agents should use @tool decorator
+from agents_framework.tools.base_tools import (
+    DatabaseTools,
+    EmailTools,
+    AnalyticsTools,
+    UtilityTools,
+    create_standard_toolset,
+)
+from agents_framework.tools.web_tools import (
+    WebSearchTools,
+    WebScrapingTools,
+    URLTools,
+    create_web_toolset,
+)
 from agents_framework.core.example_agent import JobAnalystAgent, create_job_analyst_agent
 
 __version__ = "0.1.0"
@@ -35,6 +46,18 @@ __all__ = [
     "ConversationMemory",
     "SemanticMemory",
     "AgentMemoryManager",
+    "VectorMemoryStore",
+    "RAGMemoryManager",
+    # Tools
+    "DatabaseTools",
+    "EmailTools",
+    "AnalyticsTools",
+    "UtilityTools",
+    "create_standard_toolset",
+    "WebSearchTools",
+    "WebScrapingTools",
+    "URLTools",
+    "create_web_toolset",
     # Example Agent
     "JobAnalystAgent",
     "create_job_analyst_agent",
