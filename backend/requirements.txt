@@ -6,3 +6,18 @@ pydantic
 pydantic-settings
 websockets
 openai
+
+# AI Agent Framework
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langgraph>=0.0.20
+langchain-community>=0.0.20
+
+# Vector Database for RAG
+chromadb>=0.4.22
+
+# Token counting and utilities
+tiktoken>=0.5.2
+
+# Optional: LangSmith for debugging and monitoring
+langsmith>=0.0.77
