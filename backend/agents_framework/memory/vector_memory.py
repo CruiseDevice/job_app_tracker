@@ -422,7 +422,8 @@ class RAGMemoryManager:
         """
         meta = metadata or {}
         meta["category"] = category
-        meta["tags"] = tags or []
+        # Convert tags list to comma-separated string (ChromaDB doesn't accept lists)
+        meta["tags"] = ",".join(tags) if tags else ""
         meta["agent"] = self.agent_name
 
         return self.vector_store.add(experience, metadata=meta)

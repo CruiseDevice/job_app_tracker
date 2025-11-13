@@ -6,7 +6,7 @@ Provides tools for web scraping, search, and research.
 
 import logging
 from typing import List, Dict, Any, Optional
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 import re
 
 logger = logging.getLogger(__name__)
