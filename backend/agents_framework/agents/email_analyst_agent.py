@@ -483,6 +483,113 @@ class EmailAnalystAgent(BaseAgent):
             description="Recommend appropriate follow-up action based on email category. Input should be the email category (interview_invite, rejection, offer, assessment, screening, etc.)."
         )
 
+        # Tool 7: Analyze Email Thread
+        def analyze_email_thread(thread_data: str) -> str:
+            """
+            Analyze a conversation thread of multiple emails to understand the progression.
+            Input should be formatted as: 'Email 1: [subject]|[sender]|[date]|[body] /// Email 2: ...'
+            """
+            try:
+                # Parse thread data
+                emails = []
+                thread_parts = thread_data.split('///')
+
+                for part in thread_parts:
+                    part = part.strip()
+                    if not part:
+                        continue
+
+                    # Try to parse email data
+                    if '|' in part:
+                        parts = part.split('|', 3)
+                        if len(parts) >= 4:
+                            subject = parts[0].replace('Email ', '').strip()
+                            sender = parts[1].strip()
+                            date = parts[2].strip()
+                            body = parts[3].strip()
+
+                            emails.append({
+                                'subject': subject,
+                                'sender': sender,
+                                'date': date,
+                                'body': body[:200]  # Truncate for analysis
+                            })
+
+                if not emails:
+                    return "Unable to parse email thread. Please format as: 'subject|sender|date|body /// subject|sender|date|body'"
+
+                result = f"🧵 EMAIL THREAD ANALYSIS ({len(emails)} emails)\n\n"
+
+                # Timeline
+                result += "Timeline:\n"
+                for i, email in enumerate(emails, 1):
+                    result += f"  {i}. {email['date']} - From {email['sender']}\n"
+                    result += f"     Subject: {email['subject']}\n"
+
+                result += "\n"
+
+                # Conversation progression
+                result += "Conversation Progression:\n"
+
+                # Identify pattern
+                senders = [e['sender'] for e in emails]
+                unique_senders = list(set(senders))
+
+                if len(unique_senders) == 1:
+                    result += "  • One-way communication (all from same sender)\n"
+                elif len(emails) >= 2:
+                    result += f"  • Two-way conversation ({len(unique_senders)} participants)\n"
+                    result += f"  • Total exchanges: {len(emails)}\n"
+
+                # Sentiment progression
+                sentiments = []
+                for email in emails:
+                    text = f"{email['subject']} {email['body']}".lower()
+                    if any(word in text for word in ['congratulations', 'offer', 'selected', 'excited']):
+                        sentiments.append('positive')
+                    elif any(word in text for word in ['unfortunately', 'rejected', 'not selected']):
+                        sentiments.append('negative')
+                    else:
+                        sentiments.append('neutral')
+
+                if len(set(sentiments)) > 1:
+                    result += f"  • Sentiment shift detected: {' → '.join(sentiments)}\n"
+                else:
+                    result += f"  • Consistent sentiment: {sentiments[0]}\n"
+
+                result += "\n"
+
+                # Key insights
+                result += "Key Insights:\n"
+
+                # Check for response time
+                if len(emails) >= 2:
+                    result += "  • Active conversation thread\n"
+
+                # Check for action items across thread
+                all_text = ' '.join([e['body'] for e in emails]).lower()
+                if any(word in all_text for word in ['interview', 'schedule', 'meet']):
+                    result += "  • Interview scheduling in progress\n"
+                if any(word in all_text for word in ['offer', 'compensation', 'accept']):
+                    result += "  • Offer negotiation/discussion\n"
+                if any(word in all_text for word in ['assessment', 'challenge', 'test']):
+                    result += "  • Technical assessment phase\n"
+
+                result += "\n"
+                result += "💡 Recommendation: Review the full thread to understand the complete context and progression.\n"
+
+                return result
+
+            except Exception as e:
+                logger.error(f"Error analyzing thread: {e}")
+                return f"Error analyzing email thread: {str(e)}"
+
+        self.add_tool(
+            name="analyze_email_thread",
+            func=analyze_email_thread,
+            description="Analyze a thread of multiple emails to understand conversation progression, sentiment changes, and timeline. Input should be formatted thread data with email details separated by '///'."
+        )
+
     def get_system_prompt(self) -> str:
         """Define the agent's role and capabilities"""
         return """You are an Email Analyst Agent, an expert in analyzing job-related emails and providing actionable insights.
@@ -494,6 +601,7 @@ Your role is to:
 4. Identify company names and job positions mentioned
 5. Match emails to existing job applications in the database
 6. Recommend appropriate follow-up actions
+7. Understand email conversation threads and track progression
 
 You have access to powerful tools for:
 - Sentiment analysis to determine if email is good/bad news
@@ -502,14 +610,20 @@ You have access to powerful tools for:
 - Company and position extraction from email text
 - Application matching to find related jobs in the database
 - Follow-up recommendations based on email type
+- Email thread analysis for understanding conversation flow
 
-When analyzing an email:
+When analyzing a single email:
 1. First, use analyze_email_sentiment to understand the tone and urgency
 2. Use categorize_email to determine what type of email it is
 3. Use extract_company_position to identify the company and role
 4. Use find_matching_applications to see if we have this application in our database
 5. Use extract_action_items to identify what needs to be done
 6. Use recommend_followup to suggest next steps
+
+When analyzing an email thread:
+1. Use analyze_email_thread to understand the conversation progression
+2. Identify sentiment shifts and key milestones in the conversation
+3. Provide insights on the overall trajectory of the communication
 
 Always provide:
 - Clear, actionable insights
@@ -581,6 +695,68 @@ Provide a structured analysis with actionable recommendations."""
 
         except Exception as e:
             logger.error(f"Error in analyze_email: {e}")
+            return {
+                'success': False,
+                'analysis': '',
+                'error': str(e),
+            }
+
+    async def analyze_thread(
+        self,
+        emails: List[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Analyze a thread of related emails.
+
+        Args:
+            emails: List of email dicts with 'subject', 'body', 'sender', 'date' keys
+            metadata: Optional metadata about the thread
+
+        Returns:
+            Dictionary with thread analysis results
+        """
+        try:
+            # Format thread data for the tool
+            thread_data = ' /// '.join([
+                f"{email.get('subject', 'No Subject')}|{email.get('sender', 'Unknown')}|{email.get('date', 'Unknown')}|{email.get('body', '')}"
+                for email in emails
+            ])
+
+            # Create analysis request
+            query = f"""Analyze this email conversation thread to understand the progression and provide insights:
+
+Thread contains {len(emails)} emails.
+
+Please:
+1. Use analyze_email_thread to understand the conversation flow
+2. Identify key milestones and sentiment changes
+3. Extract overall action items from the thread
+4. Provide recommendations based on the thread's current state
+
+Thread data: {thread_data[:1000]}..."""
+
+            # Run the agent
+            response = await self.run(query, context=metadata)
+
+            # Store the thread analysis
+            if response.success:
+                self.rag_memory.store_experience(
+                    experience=f"Analyzed email thread with {len(emails)} emails: {response.output[:200]}",
+                    category="thread_analysis",
+                    tags=[f"{len(emails)}_emails", "thread"],
+                )
+
+            return {
+                'success': response.success,
+                'analysis': response.output,
+                'email_count': len(emails),
+                'metadata': response.metadata,
+                'error': response.error,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in analyze_thread: {e}")
             return {
                 'success': False,
                 'analysis': '',
