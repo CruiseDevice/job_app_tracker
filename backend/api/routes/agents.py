@@ -14,6 +14,7 @@ from database.database_manager import DatabaseManager
 from agents_framework.agents.email_analyst_agent import create_email_analyst_agent
 from agents_framework.agents.followup_agent import create_followup_agent
 from agents_framework.agents.job_hunter_agent import create_job_hunter_agent
+from agents_framework.agents.resume_writer_agent import create_resume_writer_agent
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +218,69 @@ class JobRecommendationsResponse(BaseModel):
     """Response model for job recommendations"""
     success: bool
     analysis: str
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+# Resume Writer Agent Request/Response Models
+class ResumeAnalysisRequest(BaseModel):
+    """Request model for resume analysis"""
+    resume_text: str = Field(..., description="Resume content to analyze")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "resume_text": "John Doe\\nSoftware Engineer\\n\\nExperience:\\n- Developed web applications...",
+                "metadata": {}
+            }
+        }
+
+
+class ResumeTailorRequest(BaseModel):
+    """Request model for resume tailoring"""
+    job_title: str = Field(..., description="Target job title")
+    job_requirements: str = Field(..., description="Key requirements from job description")
+    candidate_experience: str = Field(..., description="Candidate's relevant experience")
+    keywords: str = Field("", description="Target keywords from job description")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_title": "Senior Software Engineer",
+                "job_requirements": "5+ years Python, React, AWS experience. Strong communication skills.",
+                "candidate_experience": "6 years full-stack development with Python/React",
+                "keywords": "Python, React, AWS, Agile, REST API",
+                "metadata": {}
+            }
+        }
+
+
+class CoverLetterRequest(BaseModel):
+    """Request model for cover letter generation"""
+    company: str = Field(..., description="Target company name")
+    position: str = Field(..., description="Job position")
+    motivation: str = Field(..., description="Key motivation for applying")
+    achievement: str = Field("", description="Relevant achievement to highlight")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "company": "Google",
+                "position": "Software Engineer",
+                "motivation": "passion for scalable systems",
+                "achievement": "led a team that reduced API latency by 60%",
+                "metadata": {}
+            }
+        }
+
+
+class ResumeWriterResponse(BaseModel):
+    """Response model for resume writer operations"""
+    success: bool
+    output: str
     metadata: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
@@ -995,6 +1059,311 @@ async def job_hunter_websocket(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("🔌 Job Hunter WebSocket connection closed")
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+# Resume Writer Agent Endpoints
+@router.post("/resume-writer/analyze", response_model=ResumeWriterResponse)
+async def analyze_resume(
+    request: ResumeAnalysisRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Analyze a resume and provide comprehensive feedback.
+
+    This endpoint uses AI to:
+    - Parse resume sections and structure
+    - Check ATS (Applicant Tracking System) compatibility
+    - Identify strengths and weaknesses
+    - Provide specific improvement recommendations
+    - Analyze content metrics and formatting
+
+    Returns detailed analysis with actionable insights.
+    """
+    try:
+        logger.info(f"📄 Resume Writer: Analyzing resume ({len(request.resume_text)} chars)")
+
+        # Create agent
+        agent = create_resume_writer_agent(db)
+
+        # Analyze resume
+        result = await agent.analyze_resume(
+            resume_text=request.resume_text,
+            metadata=request.metadata
+        )
+
+        logger.info(f"✅ Resume analysis {'successful' if result['success'] else 'failed'}")
+
+        return ResumeWriterResponse(
+            success=result['success'],
+            output=result.get('analysis', ''),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in resume analysis: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing resume: {str(e)}"
+        )
+
+
+@router.post("/resume-writer/tailor", response_model=ResumeWriterResponse)
+async def tailor_resume(
+    request: ResumeTailorRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Tailor a resume for a specific job posting.
+
+    This endpoint uses AI to:
+    - Match resume keywords to job requirements
+    - Optimize content for target role
+    - Suggest specific phrasing and content changes
+    - Recommend experience highlighting
+    - Provide keyword placement strategies
+
+    Returns comprehensive tailoring recommendations.
+    """
+    try:
+        logger.info(f"🎯 Resume Writer: Tailoring resume for {request.job_title}")
+
+        # Create agent
+        agent = create_resume_writer_agent(db)
+
+        # Tailor resume
+        result = await agent.tailor_for_job(
+            job_title=request.job_title,
+            job_requirements=request.job_requirements,
+            candidate_experience=request.candidate_experience,
+            keywords=request.keywords,
+            metadata=request.metadata
+        )
+
+        logger.info(f"✅ Resume tailoring {'successful' if result['success'] else 'failed'}")
+
+        return ResumeWriterResponse(
+            success=result['success'],
+            output=result.get('recommendations', ''),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in resume tailoring: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error tailoring resume: {str(e)}"
+        )
+
+
+@router.post("/resume-writer/cover-letter", response_model=ResumeWriterResponse)
+async def generate_cover_letter(
+    request: CoverLetterRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Generate a compelling cover letter.
+
+    This endpoint uses AI to:
+    - Create personalized opening paragraphs
+    - Provide multiple style options (achievement, passion, value-focused)
+    - Include company-specific customization tips
+    - Offer subject line suggestions
+    - Provide personalization checklists
+
+    Returns complete cover letter content and guidance.
+    """
+    try:
+        logger.info(f"✉️ Resume Writer: Generating cover letter for {request.company}")
+
+        # Create agent
+        agent = create_resume_writer_agent(db)
+
+        # Generate cover letter
+        result = await agent.generate_cover_letter(
+            company=request.company,
+            position=request.position,
+            motivation=request.motivation,
+            achievement=request.achievement,
+            metadata=request.metadata
+        )
+
+        logger.info(f"✅ Cover letter generation {'successful' if result['success'] else 'failed'}")
+
+        return ResumeWriterResponse(
+            success=result['success'],
+            output=result.get('cover_letter', ''),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in cover letter generation: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating cover letter: {str(e)}"
+        )
+
+
+@router.get("/resume-writer/stats", response_model=AgentStatsResponse)
+async def get_resume_writer_stats(db: DatabaseManager = Depends(get_db)):
+    """
+    Get statistics and status information for the Resume Writer Agent.
+
+    Returns:
+    - Agent name and configuration
+    - Number of executions
+    - Available tools count
+    - Memory usage
+    - Performance metrics
+    """
+    try:
+        logger.info("📊 Resume Writer: Getting agent statistics")
+
+        # Create agent
+        agent = create_resume_writer_agent(db)
+
+        # Get statistics
+        stats = agent.get_stats()
+
+        return AgentStatsResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"❌ Error getting agent stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving agent statistics: {str(e)}"
+        )
+
+
+# WebSocket endpoint for real-time resume writing operations
+@router.websocket("/resume-writer/ws")
+async def resume_writer_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time resume writing operations.
+
+    Allows streaming results as the agent processes requests.
+
+    Message format:
+    - Client sends: {"type": "analyze", "data": {"resume_text": "..."}}
+    - Client sends: {"type": "tailor", "data": {...}}
+    - Client sends: {"type": "cover_letter", "data": {...}}
+    - Server sends: {"type": "operation_complete", "data": {...}}
+    """
+    await websocket.accept()
+    logger.info("🔌 Resume Writer WebSocket connection established")
+
+    try:
+        db = DatabaseManager()
+        agent = create_resume_writer_agent(db)
+
+        while True:
+            # Receive message from client
+            data = await websocket.receive_json()
+
+            message_type = data.get("type")
+            request_data = data.get("data", {})
+
+            if message_type == "analyze":
+                # Send acknowledgment
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "resume_analysis", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.analyze_resume(
+                        resume_text=request_data.get("resume_text", ""),
+                        metadata=request_data.get("metadata")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket resume analysis: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "tailor":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "resume_tailoring", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.tailor_for_job(
+                        job_title=request_data.get("job_title", ""),
+                        job_requirements=request_data.get("job_requirements", ""),
+                        candidate_experience=request_data.get("candidate_experience", ""),
+                        keywords=request_data.get("keywords", ""),
+                        metadata=request_data.get("metadata")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket resume tailoring: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "cover_letter":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "cover_letter_generation", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.generate_cover_letter(
+                        company=request_data.get("company", ""),
+                        position=request_data.get("position", ""),
+                        motivation=request_data.get("motivation", ""),
+                        achievement=request_data.get("achievement", ""),
+                        metadata=request_data.get("metadata")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket cover letter generation: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "ping":
+                await websocket.send_json({
+                    "type": "pong",
+                    "data": {"timestamp": datetime.now().isoformat()}
+                })
+
+            else:
+                await websocket.send_json({
+                    "type": "error",
+                    "data": {"error": f"Unknown message type: {message_type}"}
+                })
+
+    except WebSocketDisconnect:
+        logger.info("🔌 Resume Writer WebSocket connection closed")
     except Exception as e:
         logger.error(f"❌ WebSocket error: {e}")
         try:

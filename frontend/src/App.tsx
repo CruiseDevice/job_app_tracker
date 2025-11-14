@@ -5,6 +5,9 @@ import Layout from './components/Layout/Layout';
 import Dashboard from './components/Dashboard/Dashboard';
 import { ApplicationsDashboard } from './components/Applications/ApplicationsDashboard';
 import Settings from './components/Settings/Settings';
+import EmailAnalystDashboard from './components/Agents/EmailAnalyst/EmailAnalystDashboard';
+import FollowUpAgentDashboard from './components/Agents/FollowUp/FollowUpAgentDashboard';
+import ResumeWriterDashboard from './components/Agents/ResumeWriter/ResumeWriterDashboard';
 
 function App() {
   return (
@@ -13,6 +16,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/applications" element={<ApplicationsDashboard />} />
+          <Route path="/agents/email-analyst" element={<EmailAnalystDashboard />} />
+          <Route path="/agents/followup" element={<FollowUpAgentDashboard />} />
+          <Route path="/agents/resume-writer" element={<ResumeWriterDashboard />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
