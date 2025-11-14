@@ -16,6 +16,7 @@ from agents_framework.agents.followup_agent import create_followup_agent
 from agents_framework.agents.job_hunter_agent import create_job_hunter_agent
 from agents_framework.agents.resume_writer_agent import create_resume_writer_agent
 from agents_framework.agents.interview_prep_agent import create_interview_prep_agent
+from agents_framework.agents.orchestrator_agent import create_orchestrator_agent
 
 logger = logging.getLogger(__name__)
 
@@ -1923,6 +1924,489 @@ async def interview_prep_websocket(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("🔌 Interview Prep WebSocket connection closed")
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+# ============================================================================
+# ORCHESTRATOR AGENT ENDPOINTS
+# ============================================================================
+
+# Orchestrator Agent Request/Response Models
+
+class WorkflowTaskDefinition(BaseModel):
+    """Definition of a task in a workflow"""
+    agent_name: str = Field(..., description="Name of the agent to execute this task")
+    task_description: str = Field(..., description="Description of what the task should do")
+    input_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Input data for the task")
+    dependencies: Optional[List[str]] = Field(default_factory=list, description="IDs of tasks this task depends on")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+
+class WorkflowExecutionRequest(BaseModel):
+    """Request model for executing a multi-agent workflow"""
+    workflow_name: str = Field(..., description="Name of the workflow")
+    workflow_description: str = Field(..., description="Description of what the workflow does")
+    tasks: List[WorkflowTaskDefinition] = Field(..., description="List of tasks in the workflow")
+    execution_mode: str = Field("sequential", description="Execution mode: sequential or parallel")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "workflow_name": "Job Application Workflow",
+                "workflow_description": "Search for jobs, tailor resume, and draft cover letter",
+                "execution_mode": "sequential",
+                "tasks": [
+                    {
+                        "agent_name": "Job Hunter",
+                        "task_description": "Search for Software Engineer jobs in San Francisco",
+                        "input_data": {"keywords": "Software Engineer", "location": "San Francisco"}
+                    },
+                    {
+                        "agent_name": "Resume Writer",
+                        "task_description": "Tailor resume for the top job match",
+                        "input_data": {}
+                    }
+                ]
+            }
+        }
+
+
+class RouteTaskRequest(BaseModel):
+    """Request model for routing a task to a specific agent"""
+    agent_name: str = Field(..., description="Name of the agent to route to")
+    task: str = Field(..., description="Task description")
+    context: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "agent_name": "Email Analyst",
+                "task": "Analyze this job interview invitation email",
+                "context": {"urgency": "high"}
+            }
+        }
+
+
+class CoordinateAgentsRequest(BaseModel):
+    """Request model for coordinating multiple agents"""
+    task: str = Field(..., description="The complex task requiring multiple agents")
+    context: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "task": "Help me apply to a Software Engineer position at Google - search for the job, tailor my resume, generate a cover letter, and prepare for the interview",
+                "context": {}
+            }
+        }
+
+
+class OrchestratorResponse(BaseModel):
+    """Response model for orchestrator operations"""
+    success: bool
+    output: Optional[str] = None
+    workflow_id: Optional[str] = None
+    results: Optional[List[Dict[str, Any]]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+class WorkflowStatusResponse(BaseModel):
+    """Response model for workflow status"""
+    workflow_id: str
+    status: str
+    task_count: int
+    completed_tasks: int
+    failed_tasks: int
+    pending_tasks: int
+    running_tasks: int
+
+
+class OrchestratorStatsResponse(BaseModel):
+    """Response model for orchestrator statistics"""
+    name: str
+    execution_count: int
+    tools_count: int
+    memory_size: int
+    registered_agents: List[str]
+    workflow_stats: Dict[str, Any]
+    communication_stats: Dict[str, Any]
+
+
+# Orchestrator Agent Endpoints
+
+@router.post("/orchestrator/execute-workflow", response_model=OrchestratorResponse)
+async def execute_workflow(
+    request: WorkflowExecutionRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Execute a multi-agent workflow.
+
+    This endpoint allows you to coordinate multiple agents in a workflow:
+    - Define tasks for each agent
+    - Specify execution order (sequential or parallel)
+    - Set dependencies between tasks
+    - Get aggregated results
+
+    Perfect for complex, multi-step operations that require multiple specialized agents.
+    """
+    try:
+        logger.info(f"🎭 Orchestrator: Executing workflow '{request.workflow_name}' with {len(request.tasks)} tasks")
+
+        # Create orchestrator
+        orchestrator = create_orchestrator_agent(db)
+
+        # Convert task definitions to dict format
+        tasks = [
+            {
+                "agent_name": task.agent_name,
+                "task_description": task.task_description,
+                "input_data": task.input_data or {},
+                "dependencies": task.dependencies or [],
+                "metadata": task.metadata
+            }
+            for task in request.tasks
+        ]
+
+        # Execute workflow
+        result = await orchestrator.execute_workflow(
+            workflow_name=request.workflow_name,
+            workflow_description=request.workflow_description,
+            tasks=tasks,
+            execution_mode=request.execution_mode
+        )
+
+        logger.info(f"✅ Workflow execution {'successful' if result.get('success') else 'failed'}")
+
+        return OrchestratorResponse(
+            success=result.get("success", False),
+            workflow_id=result.get("workflow_id"),
+            results=result.get("results"),
+            metadata=result.get("metadata"),
+            error=result.get("error")
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error executing workflow: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error executing workflow: {str(e)}"
+        )
+
+
+@router.post("/orchestrator/route-task", response_model=OrchestratorResponse)
+async def route_task_to_agent(
+    request: RouteTaskRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Route a task directly to a specific agent.
+
+    Use this when you know exactly which agent should handle a task.
+    The orchestrator will:
+    - Validate the agent exists
+    - Route the task to the agent
+    - Return the agent's response
+    """
+    try:
+        logger.info(f"🎯 Orchestrator: Routing task to {request.agent_name}")
+
+        # Create orchestrator
+        orchestrator = create_orchestrator_agent(db)
+
+        # Route task
+        result = await orchestrator.route_to_agent(
+            agent_name=request.agent_name,
+            task=request.task,
+            context=request.context
+        )
+
+        logger.info(f"✅ Task routing {'successful' if result.success else 'failed'}")
+
+        return OrchestratorResponse(
+            success=result.success,
+            output=result.output,
+            metadata=result.metadata,
+            error=result.error
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error routing task: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error routing task: {str(e)}"
+        )
+
+
+@router.post("/orchestrator/coordinate", response_model=OrchestratorResponse)
+async def coordinate_agents(
+    request: CoordinateAgentsRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Coordinate multiple agents to complete a complex task.
+
+    The orchestrator will:
+    - Analyze the task
+    - Determine which agents are needed
+    - Create an optimal workflow
+    - Execute the workflow
+    - Synthesize results
+
+    This is the most intelligent endpoint - just describe what you want to accomplish,
+    and the orchestrator will figure out how to coordinate the agents.
+    """
+    try:
+        logger.info(f"🎭 Orchestrator: Coordinating agents for complex task")
+
+        # Create orchestrator
+        orchestrator = create_orchestrator_agent(db)
+
+        # Coordinate agents
+        result = await orchestrator.coordinate_agents(
+            task=request.task,
+            context=request.context
+        )
+
+        logger.info(f"✅ Agent coordination {'successful' if result.get('success') else 'failed'}")
+
+        return OrchestratorResponse(
+            success=result.get("success", False),
+            output=result.get("plan") or result.get("message"),
+            metadata=result.get("metadata"),
+            error=result.get("error")
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error coordinating agents: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error coordinating agents: {str(e)}"
+        )
+
+
+@router.get("/orchestrator/workflow-status/{workflow_id}", response_model=WorkflowStatusResponse)
+async def get_workflow_status(
+    workflow_id: str,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Get the status of a running or completed workflow.
+
+    Returns:
+    - Workflow status (pending, running, completed, failed)
+    - Task completion statistics
+    - Progress information
+    """
+    try:
+        logger.info(f"📊 Orchestrator: Getting status for workflow {workflow_id}")
+
+        # Create orchestrator
+        orchestrator = create_orchestrator_agent(db)
+
+        # Get status
+        status = orchestrator.get_workflow_status(workflow_id)
+
+        if not status:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Workflow {workflow_id} not found"
+            )
+
+        return WorkflowStatusResponse(**status)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error getting workflow status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting workflow status: {str(e)}"
+        )
+
+
+@router.get("/orchestrator/stats", response_model=OrchestratorStatsResponse)
+async def get_orchestrator_stats(db: DatabaseManager = Depends(get_db)):
+    """
+    Get Orchestrator Agent statistics and performance metrics.
+
+    Returns:
+    - Number of registered agents
+    - Workflow execution statistics
+    - Communication protocol statistics
+    - Agent performance metrics
+    """
+    try:
+        logger.info("📊 Orchestrator: Getting agent statistics")
+
+        # Create orchestrator
+        orchestrator = create_orchestrator_agent(db)
+
+        # Get statistics
+        stats = orchestrator.get_orchestrator_stats()
+
+        return OrchestratorStatsResponse(
+            name=stats["name"],
+            execution_count=stats["execution_count"],
+            tools_count=stats["tools_count"],
+            memory_size=stats["memory_size"],
+            registered_agents=stats["registered_agents"],
+            workflow_stats=stats["workflow_stats"],
+            communication_stats=stats["communication_stats"]
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error getting orchestrator stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving orchestrator statistics: {str(e)}"
+        )
+
+
+@router.websocket("/orchestrator/ws")
+async def orchestrator_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time orchestrator operations.
+
+    Supported message types:
+    - execute_workflow: Execute a multi-agent workflow
+    - route_task: Route task to specific agent
+    - coordinate: Coordinate multiple agents
+    - workflow_status: Get workflow status
+    - ping: Connection health check
+    """
+    await websocket.accept()
+    logger.info("🔌 Orchestrator WebSocket connection established")
+
+    db = DatabaseManager()
+    orchestrator = create_orchestrator_agent(db)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            message_type = data.get("type")
+            request_data = data.get("data", {})
+
+            logger.info(f"📨 Received Orchestrator WebSocket message: {message_type}")
+
+            if message_type == "execute_workflow":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"message": "Executing workflow..."}
+                })
+
+                try:
+                    result = await orchestrator.execute_workflow(
+                        workflow_name=request_data.get("workflow_name", ""),
+                        workflow_description=request_data.get("workflow_description", ""),
+                        tasks=request_data.get("tasks", []),
+                        execution_mode=request_data.get("execution_mode", "sequential")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket workflow execution: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "route_task":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"message": "Routing task..."}
+                })
+
+                try:
+                    result = await orchestrator.route_to_agent(
+                        agent_name=request_data.get("agent_name", ""),
+                        task=request_data.get("task", ""),
+                        context=request_data.get("context")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": {
+                            "success": result.success,
+                            "output": result.output,
+                            "metadata": result.metadata,
+                            "error": result.error
+                        }
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket task routing: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "coordinate":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"message": "Coordinating agents..."}
+                })
+
+                try:
+                    result = await orchestrator.coordinate_agents(
+                        task=request_data.get("task", ""),
+                        context=request_data.get("context")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket agent coordination: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "workflow_status":
+                try:
+                    workflow_id = request_data.get("workflow_id")
+                    status = orchestrator.get_workflow_status(workflow_id)
+
+                    await websocket.send_json({
+                        "type": "status_update",
+                        "data": status if status else {"error": "Workflow not found"}
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error getting workflow status: {e}")
+                    await websocket.send_json({
+                        "type": "error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "ping":
+                await websocket.send_json({
+                    "type": "pong",
+                    "data": {"timestamp": datetime.now().isoformat()}
+                })
+
+            else:
+                await websocket.send_json({
+                    "type": "error",
+                    "data": {"error": f"Unknown message type: {message_type}"}
+                })
+
+    except WebSocketDisconnect:
+        logger.info("🔌 Orchestrator WebSocket connection closed")
     except Exception as e:
         logger.error(f"❌ WebSocket error: {e}")
         try:
