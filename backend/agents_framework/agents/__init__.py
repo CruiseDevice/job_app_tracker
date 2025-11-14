@@ -16,6 +16,10 @@ from agents_framework.agents.resume_writer_agent import (
     ResumeWriterAgent,
     create_resume_writer_agent,
 )
+from agents_framework.agents.analytics_agent import (
+    AnalyticsAgent,
+    create_analytics_agent,
+)
 
 __all__ = [
     "EmailAnalystAgent",
@@ -24,4 +28,6 @@ __all__ = [
     "create_followup_agent",
     "ResumeWriterAgent",
     "create_resume_writer_agent",
+    "AnalyticsAgent",
+    "create_analytics_agent",
 ]
