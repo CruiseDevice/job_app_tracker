@@ -9,6 +9,11 @@ interface ApplicationsState {
   filters: ApplicationFilters;
   loading: boolean;
   error: string | null;
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    total: number;
+  };
 }
 
 const initialState: ApplicationsState = {
@@ -17,6 +22,11 @@ const initialState: ApplicationsState = {
   filters: {},
   loading: false,
   error: null,
+  pagination: {
+    currentPage: 1,
+    pageSize: 12,
+    total: 0,
+  },
 };
 
 // Async thunks
@@ -74,11 +84,19 @@ const applicationsSlice = createSlice({
     setFilters: (state, action: PayloadAction<ApplicationFilters>) => {
       state.filters = action.payload;
     },
+    setPage: (state, action: PayloadAction<number>) => {
+      state.pagination.currentPage = action.payload;
+    },
+    setPageSize: (state, action: PayloadAction<number>) => {
+      state.pagination.pageSize = action.payload;
+      state.pagination.currentPage = 1; // Reset to first page when changing page size
+    },
     clearError: (state) => {
       state.error = null;
     },
     addApplicationFromWebSocket: (state, action: PayloadAction<JobApplication>) => {
       state.applications.unshift(action.payload);
+      state.pagination.total += 1;
     },
     updateApplicationFromWebSocket: (state, action: PayloadAction<JobApplication>) => {
       const index = state.applications.findIndex(app => app.id === action.payload.id);
@@ -96,7 +114,8 @@ const applicationsSlice = createSlice({
       })
       .addCase(fetchApplications.fulfilled, (state, action) => {
         state.loading = false;
-        state.applications = action.payload;
+        state.applications = action.payload.applications;
+        state.pagination.total = action.payload.total;
       })
       .addCase(fetchApplications.rejected, (state, action) => {
         state.loading = false;
@@ -129,16 +148,20 @@ const applicationsSlice = createSlice({
       // Add application
       .addCase(addApplication.fulfilled, (state, action) => {
         state.applications.unshift(action.payload);
+        state.pagination.total += 1;
       })
       // Delete application
       .addCase(deleteApplication.fulfilled, (state, action) => {
         state.applications = state.applications.filter(app => app.id !== action.payload);
+        state.pagination.total -= 1;
       });
   },
 });
 
 export const { 
   setFilters, 
+  setPage,
+  setPageSize,
   clearError, 
   addApplicationFromWebSocket, 
   updateApplicationFromWebSocket 

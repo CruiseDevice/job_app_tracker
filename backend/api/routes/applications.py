@@ -19,8 +19,15 @@ async def get_applications(
     search: Optional[str] = Query(None),
     db: DatabaseManager = Depends(get_db)
 ):
-    """Get job applications with optional filtering"""
+    """Get job applications with optional filtering and pagination"""
     try:
+        # Get total count with the same filters
+        total_count = db.get_applications_count(
+            status=status,
+            company=company,
+            search=search
+        )
+        
         applications = db.get_applications(
             skip=skip, 
             limit=limit, 
@@ -30,7 +37,12 @@ async def get_applications(
         )
         
         # Convert to dictionaries for JSON response
-        return [app.to_dict() for app in applications]
+        return {
+            "applications": [app.to_dict() for app in applications],
+            "total": total_count,
+            "skip": skip,
+            "limit": limit
+        }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving applications: {str(e)}")

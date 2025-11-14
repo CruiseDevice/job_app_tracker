@@ -1,7 +1,7 @@
 // FILE: frontend/src/components/Agents/EmailAnalyst/EmailAnalysisCard.tsx
 
 import React, { useState } from 'react';
-import SentimentBadge, { SentimentType, UrgencyLevel } from './SentimentBadge';
+import SentimentBadge, { type SentimentType, type UrgencyLevel } from './SentimentBadge';
 import ActionItemsList from './ActionItemsList';
 import FollowupRecommendations from './FollowupRecommendations';
 

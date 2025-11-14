@@ -1,10 +1,15 @@
 import os
+from pathlib import Path
 from typing import Optional
 from pydantic_settings import BaseSettings
 
+# Get the backend directory path
+BACKEND_DIR = Path(__file__).parent.parent
+DATABASE_PATH = BACKEND_DIR / "database.db"
+
 class Settings(BaseSettings):
     # Database
-    database_url: str = "sqlite:///./backend/database.db"
+    database_url: str = f"sqlite:///{DATABASE_PATH}"
     
     # API Settings
     api_host: str = "127.0.0.1"

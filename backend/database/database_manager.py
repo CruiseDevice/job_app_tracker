@@ -184,6 +184,51 @@ class DatabaseManager:
         finally:
             session.close()
 
+    def get_applications_count(
+        self,
+        status: Optional[str] = None,
+        company: Optional[str] = None,
+        search: Optional[str] = None,
+        source_type: Optional[str] = None,
+        job_board: Optional[str] = None
+    ) -> int:
+        """Get total count of job applications with the same filters as get_applications"""
+        session = self.get_session()
+        try:
+            query = session.query(JobApplication)
+            
+            # Apply the same filters as get_applications
+            if status:
+                query = query.filter(JobApplication.status == status)
+            
+            if company:
+                query = query.filter(JobApplication.company.ilike(f"%{company}%"))
+            
+            if source_type:
+                query = query.filter(JobApplication.source_type == source_type)
+            
+            if job_board:
+                query = query.filter(JobApplication.job_board == job_board)
+            
+            if search:
+                query = query.filter(
+                    or_(
+                        JobApplication.company.ilike(f"%{search}%"),
+                        JobApplication.position.ilike(f"%{search}%"),
+                        JobApplication.location.ilike(f"%{search}%")
+                    )
+                )
+            
+            # Get count
+            count = query.count()
+            return count
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error counting applications: {e}")
+            return 0
+        finally:
+            session.close()
+
     def get_extension_jobs(self, limit: int = 100) -> List[JobApplication]:
         """Get jobs captured via browser extension"""
         return self.get_applications(source_type="extension", limit=limit)
@@ -388,16 +433,16 @@ class DatabaseManager:
         session = self.get_session()
         try:
             now = datetime.now()
-            today = now.date()
-            this_week_start = today - timedelta(days=today.weekday())
-            this_month_start = today.replace(day=1)
+            today_date = now.date()
+            this_week_start = today_date - timedelta(days=today_date.weekday())
+            this_month_start = today_date.replace(day=1)
             
             # Get total applications
             total = session.query(JobApplication).count()
             
             # Get today's applications
-            today = session.query(JobApplication).filter(
-                func.date(JobApplication.created_at) == today
+            today_count = session.query(JobApplication).filter(
+                func.date(JobApplication.created_at) == today_date
             ).count()
             
             # Get this week's applications
@@ -444,7 +489,7 @@ class DatabaseManager:
 
             return {
                 "total": total,
-                "today": today,
+                "today": today_count,
                 "thisWeek": this_week,
                 "thisMonth": this_month,
                 "avgPerDay": round(avg_per_day, 1),
@@ -1032,14 +1077,14 @@ class DatabaseManager:
         session = self.get_session()
         try:
             now = datetime.now()
-            today = now.date()
-            this_week_start = today - timedelta(days=today.weekday())
-            this_month_start = today.replace(day=1)
+            today_date = now.date()
+            this_week_start = today_date - timedelta(days=today_date.weekday())
+            this_month_start = today_date.replace(day=1)
             
             # Get basic application statistics (existing functionality)
             total = session.query(JobApplication).count()
             today_count = session.query(JobApplication).filter(
-                func.date(JobApplication.created_at) == today
+                func.date(JobApplication.created_at) == today_date
             ).count()
             this_week = session.query(JobApplication).filter(
                 JobApplication.created_at >= this_week_start

@@ -35,8 +35,8 @@ class JobMatchResponse(BaseModel):
 
 # Dependency to get database manager and matcher
 def get_db():
-    # Your existing database dependency
-    pass
+    """Dependency to get database manager"""
+    return DatabaseManager()
 
 def get_matcher(db: DatabaseManager = Depends(get_db)):
     return SmartEmailJobMatcher(db)

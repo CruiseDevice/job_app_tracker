@@ -1,12 +1,13 @@
 // frontend/src/components/Applications/ApplicationsDashboard.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, RotateCcw, AlertTriangle, X, FileText } from 'lucide-react';
 import { JobApplicationCard } from './JobApplicationCard';
 import { ApplicationTimeline } from './ApplicationTimeline';
+import { Pagination } from '../common/Pagination';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
 import { useAppSelector } from '../../hooks/useAppSelector';
-import { fetchApplications } from '../../store/slices/applicationsSlice';
+import { fetchApplications, setPage, setPageSize } from '../../store/slices/applicationsSlice';
 import { fetchStatistics } from '../../store/slices/statisticsSlice';
 import type { JobApplication } from '../../types/application';
 import type { RootState } from '../../store';
@@ -19,13 +20,12 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
   onStatusUpdate
 }) => {
   const dispatch = useAppDispatch();
-  const { applications, loading } = useAppSelector((state: RootState) => state.applications);
+  const { applications, loading, pagination } = useAppSelector((state: RootState) => state.applications);
   const { stats: statistics } = useAppSelector((state: RootState) => state.statistics);
   
   // Local state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('date');
   const [showTimeline, setShowTimeline] = useState(false);
   const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(null);
   const [duplicatesFound, setDuplicatesFound] = useState<Array<{
@@ -36,18 +36,24 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
   }>>([]);
   const [showDuplicates, setShowDuplicates] = useState(false);
 
-  const loadApplications = React.useCallback(async () => {
+  const loadApplications = useCallback(() => {
     try {
-      // Fetch applications with your existing Redux action
-      dispatch(fetchApplications());
+      const skip = (pagination.currentPage - 1) * pagination.pageSize;
+      // Fetch applications with pagination parameters
+      dispatch(fetchApplications({
+        skip,
+        limit: pagination.pageSize,
+        status: statusFilter !== 'all' ? statusFilter as any : undefined,
+        search: searchTerm || undefined,
+      }));
       dispatch(fetchStatistics());
     } catch (error) {
       console.error('Failed to load applications:', error);
     }
-  }, [dispatch]);
+  }, [dispatch, pagination.currentPage, pagination.pageSize, statusFilter, searchTerm]);
 
   useEffect(() => {
-    // Load applications and check for duplicates on mount
+    // Load applications and check for duplicates when page or filters change
     loadApplications();
     checkForDuplicates();
   }, [loadApplications]);
@@ -144,38 +150,28 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
     }
   };
 
-  // Filter and sort applications
-  const filteredApplications = applications
-    .filter((app: JobApplication) => {
-      // Search filter
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        return (
-          app.company.toLowerCase().includes(search) ||
-          app.position.toLowerCase().includes(search) ||
-          (app.location && app.location.toLowerCase().includes(search))
-        );
-      }
-      return true;
-    })
-    .filter((app: JobApplication) => {
-      // Status filter
-      if (statusFilter === 'all') return true;
-      if (statusFilter === 'active') return !['rejected', 'withdrawn', 'accepted'].includes(app.status);
-      return app.status === statusFilter;
-    })
-    .sort((a: JobApplication, b: JobApplication) => {
-      switch (sortBy) {
-        case 'date':
-          return new Date(b.application_date).getTime() - new Date(a.application_date).getTime();
-        case 'company':
-          return a.company.localeCompare(b.company);
-        case 'status':
-          return a.status.localeCompare(b.status);
-        default:
-          return 0;
-      }
-    });
+  const handlePageChange = (page: number) => {
+    dispatch(setPage(page));
+  };
+
+  const handlePageSizeChange = (pageSize: number) => {
+    dispatch(setPageSize(pageSize));
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    // Reset to first page when search changes
+    dispatch(setPage(1));
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    // Reset to first page when filter changes
+    dispatch(setPage(1));
+  };
+
+  // Calculate total pages
+  const totalPages = Math.ceil(pagination.total / pagination.pageSize);
 
   return (
     <div className="p-6">
@@ -279,7 +275,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
             type="text"
             placeholder="Search by company, position, or location..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -287,7 +283,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
         {/* Status Filter */}
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => handleStatusFilterChange(e.target.value)}
           className="border border-gray-300 rounded-md px-3 py-2"
         >
           <option value="all">All Status</option>
@@ -299,17 +295,6 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
           <option value="offer">Offer</option>
           <option value="accepted">Accepted</option>
           <option value="rejected">Rejected</option>
-        </select>
-
-        {/* Sort By */}
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="border border-gray-300 rounded-md px-3 py-2"
-        >
-          <option value="date">Date Applied</option>
-          <option value="company">Company</option>
-          <option value="status">Status</option>
         </select>
 
         {/* Refresh */}
@@ -325,12 +310,20 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
       {/* Results Summary */}
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-600">
-          Showing {filteredApplications.length} of {applications.length} applications
+          {pagination.total > 0 ? (
+            <>
+              Showing {(pagination.currentPage - 1) * pagination.pageSize + 1} to{' '}
+              {Math.min(pagination.currentPage * pagination.pageSize, pagination.total)} of{' '}
+              {pagination.total} applications
+            </>
+          ) : (
+            'No applications found'
+          )}
         </p>
         
         {searchTerm && (
           <button
-            onClick={() => setSearchTerm('')}
+            onClick={() => handleSearchChange('')}
             className="text-sm text-blue-600 hover:text-blue-800"
           >
             Clear search
@@ -344,7 +337,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           <span className="ml-3 text-gray-600">Loading applications...</span>
         </div>
-      ) : filteredApplications.length === 0 ? (
+      ) : applications.length === 0 ? (
         <div className="text-center py-12">
           <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">
@@ -352,7 +345,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
           </p>
           {searchTerm && (
             <button
-              onClick={() => setSearchTerm('')}
+              onClick={() => handleSearchChange('')}
               className="mt-2 text-blue-600 hover:text-blue-800"
             >
               Clear search to see all applications
@@ -360,17 +353,29 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
           )}
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredApplications.map((application: JobApplication) => (
-            <JobApplicationCard
-              key={application.id}
-              application={application}
-              onStatusUpdate={handleStatusUpdate}
-              onViewHistory={handleViewHistory}
-              onDelete={handleDeleteApplication}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {applications.map((application: JobApplication) => (
+              <JobApplicationCard
+                key={application.id}
+                application={application}
+                onStatusUpdate={handleStatusUpdate}
+                onViewHistory={handleViewHistory}
+                onDelete={handleDeleteApplication}
+              />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={totalPages}
+            totalItems={pagination.total}
+            pageSize={pagination.pageSize}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </>
       )}
 
       {/* Application Timeline Modal */}

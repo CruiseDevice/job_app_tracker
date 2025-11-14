@@ -14,6 +14,7 @@ class JobTrackerPopup {
       lastPosition: document.getElementById('lastPosition'),
       lastTimestamp: document.getElementById('lastTimestamp'),
       lastCapture: document.getElementById('lastCapture'),
+      todayCount: document.getElementById('todayCount'),
     }
 
     this.backendUrl = 'http://localhost:8000';
@@ -31,6 +32,9 @@ class JobTrackerPopup {
 
     // check backend connection
     await this.checkBackendConnection();
+
+    // update today's count
+    await this.updateTodayCount();
 
     // analyze current page
     await this.analyzeCurrentPage();

@@ -8,7 +8,7 @@ from services.websocket_manager import manager as websocket_manager
 from agent.email_monitor import EmailMonitor
 from database.database_manager import DatabaseManager
 from agent.email_processor import EmailProcessor
-from api.routes import applications, monitor, settings, statistics, jobs_capture, agents, monitoring
+from api.routes import applications, monitor, settings, statistics, jobs_capture, agents, monitoring, job_matching
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,7 @@ app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
 app.include_router(jobs_capture.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
+app.include_router(job_matching.router, prefix="/api", tags=["job_matching"])
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
