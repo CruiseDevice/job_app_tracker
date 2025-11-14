@@ -8,7 +8,7 @@ from services.websocket_manager import manager as websocket_manager
 from agent.email_monitor import EmailMonitor
 from database.database_manager import DatabaseManager
 from agent.email_processor import EmailProcessor
-from api.routes import applications, monitor, settings, statistics, jobs_capture, agents
+from api.routes import applications, monitor, settings, statistics, jobs_capture, agents, monitoring
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,7 @@ app.add_middleware(
 # Include API routes
 app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
 app.include_router(monitor.router, prefix="/api/monitor", tags=["monitor"])
+app.include_router(monitoring.router, prefix="/api/monitoring", tags=["monitoring"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
 app.include_router(jobs_capture.router, prefix="/api/jobs", tags=["jobs"])
