@@ -383,3 +383,227 @@ class MatchingStatistics(Base):
             "processing_time_ms": self.processing_time_ms,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class FollowUpRecord(Base):
+    """
+    Track follow-up actions for job applications
+    """
+    __tablename__ = "followup_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey('job_applications.id'), nullable=False, index=True)
+
+    # Follow-up details
+    followup_type = Column(String, nullable=False)  # "initial_application", "post_interview", "offer_response", "checking_in"
+    status = Column(String, default="scheduled")  # scheduled, sent, responded, expired, cancelled
+    priority = Column(String, default="medium")  # high, medium, low
+
+    # Timing
+    scheduled_date = Column(DateTime, nullable=False, index=True)
+    sent_date = Column(DateTime)
+    response_date = Column(DateTime)
+    optimal_send_time = Column(DateTime)  # AI-recommended optimal time
+
+    # Message content
+    subject_line = Column(Text)
+    message_body = Column(Text)
+    message_tone = Column(String, default="professional")  # professional, casual, enthusiastic
+    personalization_data = Column(Text)  # JSON with personalization details
+
+    # Strategy
+    strategy_used = Column(String)  # "timing_optimized", "pattern_based", "manual"
+    confidence_score = Column(Float)  # How confident we are in this approach
+    expected_response_rate = Column(Float)  # Predicted response likelihood
+
+    # Tracking
+    email_sent = Column(Boolean, default=False)
+    email_opened = Column(Boolean, default=False)
+    email_clicked = Column(Boolean, default=False)
+    response_received = Column(Boolean, default=False)
+    response_sentiment = Column(String)  # positive, negative, neutral
+
+    # Agent metadata
+    created_by_agent = Column(Boolean, default=True)
+    agent_reasoning = Column(Text)  # Why the agent suggested this follow-up
+    user_modified = Column(Boolean, default=False)
+    user_notes = Column(Text)
+
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "job_id": self.job_id,
+            "followup_type": self.followup_type,
+            "status": self.status,
+            "priority": self.priority,
+            "scheduled_date": self.scheduled_date.isoformat() if self.scheduled_date else None,
+            "sent_date": self.sent_date.isoformat() if self.sent_date else None,
+            "response_date": self.response_date.isoformat() if self.response_date else None,
+            "optimal_send_time": self.optimal_send_time.isoformat() if self.optimal_send_time else None,
+            "subject_line": self.subject_line,
+            "message_body": self.message_body,
+            "message_tone": self.message_tone,
+            "personalization_data": json.loads(self.personalization_data) if self.personalization_data else {},
+            "strategy_used": self.strategy_used,
+            "confidence_score": self.confidence_score,
+            "expected_response_rate": self.expected_response_rate,
+            "email_sent": self.email_sent,
+            "email_opened": self.email_opened,
+            "email_clicked": self.email_clicked,
+            "response_received": self.response_received,
+            "response_sentiment": self.response_sentiment,
+            "created_by_agent": self.created_by_agent,
+            "agent_reasoning": self.agent_reasoning,
+            "user_modified": self.user_modified,
+            "user_notes": self.user_notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def is_overdue(self) -> bool:
+        """Check if follow-up is overdue"""
+        return self.status == "scheduled" and self.scheduled_date < datetime.now()
+
+    def is_pending(self) -> bool:
+        """Check if follow-up is pending"""
+        return self.status == "scheduled"
+
+    def days_until_scheduled(self) -> int:
+        """Calculate days until scheduled follow-up"""
+        if not self.scheduled_date:
+            return 0
+        delta = self.scheduled_date - datetime.now()
+        return delta.days
+
+
+class FollowUpTemplate(Base):
+    """
+    Store reusable follow-up message templates
+    """
+    __tablename__ = "followup_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Template details
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    followup_type = Column(String, nullable=False)  # matches FollowUpRecord.followup_type
+
+    # Template content
+    subject_template = Column(Text, nullable=False)
+    body_template = Column(Text, nullable=False)
+    tone = Column(String, default="professional")
+
+    # Personalization variables
+    variables = Column(Text)  # JSON array of variables like {company}, {position}, etc.
+
+    # Effectiveness
+    times_used = Column(Integer, default=0)
+    response_rate = Column(Float, default=0.0)
+    positive_responses = Column(Integer, default=0)
+
+    # Metadata
+    is_active = Column(Boolean, default=True)
+    created_by = Column(String, default="system")
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "followup_type": self.followup_type,
+            "subject_template": self.subject_template,
+            "body_template": self.body_template,
+            "tone": self.tone,
+            "variables": json.loads(self.variables) if self.variables else [],
+            "times_used": self.times_used,
+            "response_rate": self.response_rate,
+            "positive_responses": self.positive_responses,
+            "is_active": self.is_active,
+            "created_by": self.created_by,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def get_effectiveness_rating(self) -> str:
+        """Get human-readable effectiveness rating"""
+        if self.times_used < 5:
+            return "Insufficient Data"
+        elif self.response_rate >= 0.4:
+            return "Highly Effective"
+        elif self.response_rate >= 0.25:
+            return "Effective"
+        elif self.response_rate >= 0.15:
+            return "Moderately Effective"
+        else:
+            return "Low Effectiveness"
+
+
+class FollowUpStatistics(Base):
+    """
+    Track follow-up performance and analytics
+    """
+    __tablename__ = "followup_statistics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(DateTime, nullable=False, index=True)
+
+    # Daily metrics
+    followups_scheduled = Column(Integer, default=0)
+    followups_sent = Column(Integer, default=0)
+    responses_received = Column(Integer, default=0)
+    positive_responses = Column(Integer, default=0)
+    negative_responses = Column(Integer, default=0)
+
+    # Performance metrics
+    response_rate = Column(Float, default=0.0)
+    average_response_time_hours = Column(Float)
+    optimal_send_time_accuracy = Column(Float)  # How accurate our timing predictions are
+
+    # By type
+    post_application_followups = Column(Integer, default=0)
+    post_interview_followups = Column(Integer, default=0)
+    checking_in_followups = Column(Integer, default=0)
+
+    # Agent performance
+    agent_suggestions_accepted = Column(Integer, default=0)
+    agent_suggestions_modified = Column(Integer, default=0)
+    agent_suggestions_rejected = Column(Integer, default=0)
+
+    created_at = Column(DateTime, server_default=func.now())
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "date": self.date.isoformat() if self.date else None,
+            "followups_scheduled": self.followups_scheduled,
+            "followups_sent": self.followups_sent,
+            "responses_received": self.responses_received,
+            "positive_responses": self.positive_responses,
+            "negative_responses": self.negative_responses,
+            "response_rate": self.response_rate,
+            "average_response_time_hours": self.average_response_time_hours,
+            "optimal_send_time_accuracy": self.optimal_send_time_accuracy,
+            "post_application_followups": self.post_application_followups,
+            "post_interview_followups": self.post_interview_followups,
+            "checking_in_followups": self.checking_in_followups,
+            "agent_suggestions_accepted": self.agent_suggestions_accepted,
+            "agent_suggestions_modified": self.agent_suggestions_modified,
+            "agent_suggestions_rejected": self.agent_suggestions_rejected,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def calculate_response_rate(self) -> float:
+        """Calculate response rate"""
+        if self.followups_sent == 0:
+            return 0.0
+        return self.responses_received / self.followups_sent
