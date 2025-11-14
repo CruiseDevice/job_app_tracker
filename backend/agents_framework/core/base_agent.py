@@ -6,6 +6,8 @@ It includes tool support, memory management, and ReAct pattern implementation.
 """
 
 import logging
+import uuid
+import time
 from typing import Any, Dict, List, Optional, Callable, Union
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -16,7 +18,13 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.language_models import BaseLanguageModel
 from langgraph.prebuilt import create_react_agent
 
+# Import monitoring systems
+from ..monitoring.performance_monitor import global_performance_monitor, AgentMetrics
+from ..monitoring.cost_tracker import global_cost_tracker, TokenUsage
+from ..monitoring.structured_logger import StructuredLogger, create_log_context
+
 logger = logging.getLogger(__name__)
+structured_logger = StructuredLogger(__name__)
 
 
 class AgentConfig:
@@ -96,7 +104,7 @@ class BaseAgent(ABC):
         self.name = config.name
         self.description = config.description
 
-        # Initialize LLM
+        # Initialize LLM with callbacks for token tracking
         self.llm = self._initialize_llm()
 
         # Initialize tools
@@ -110,12 +118,22 @@ class BaseAgent(ABC):
         self.agent_executor = None
         self._initialize_agent()
 
-        # Tracking
+        # Tracking (deprecated - use monitoring systems)
         self.total_tokens_used = 0
         self.total_cost = 0.0
         self.execution_count = 0
 
+        # Monitoring integration
+        self.performance_monitor = global_performance_monitor
+        self.cost_tracker = global_cost_tracker
+
         logger.info(f"✅ Agent '{self.name}' initialized with {len(self.tools)} tools")
+        structured_logger.info(
+            f"Agent initialized: {self.name}",
+            context=create_log_context(agent_name=self.name),
+            tools_count=len(self.tools),
+            model=self.config.model
+        )
 
     def _initialize_llm(self) -> BaseLanguageModel:
         """Initialize the language model"""
@@ -214,10 +232,35 @@ class BaseAgent(ABC):
         Returns:
             AgentResponse object with the agent's output
         """
+        # Generate execution ID for tracking
+        execution_id = str(uuid.uuid4())
+        start_time = time.time()
+
+        # Create log context
+        log_context = create_log_context(
+            agent_name=self.name,
+            correlation_id=context.get('correlation_id') if context else None
+        )
+
+        # Start performance monitoring
+        self.performance_monitor.start_execution(
+            agent_name=self.name,
+            execution_id=execution_id,
+            context=context
+        )
+
         try:
             self.execution_count += 1
             logger.info(f"🤖 Agent '{self.name}' starting execution #{self.execution_count}")
             logger.debug(f"Input: {input_text}")
+
+            structured_logger.info(
+                f"Agent execution started",
+                context=log_context,
+                execution_id=execution_id,
+                input_length=len(input_text),
+                has_context=context is not None
+            )
 
             # Add context to input if provided
             enhanced_input = input_text
@@ -235,6 +278,11 @@ class BaseAgent(ABC):
             # Add to memory
             self.add_message_to_memory(HumanMessage(content=input_text))
 
+            # Track tokens and costs
+            input_tokens = len(enhanced_input.split()) * 1.3  # Rough estimate
+            output_tokens = 0
+            tool_calls_count = 0
+
             # Run agent if executor is available
             if self.agent_executor:
                 result = await self.agent_executor.ainvoke({"messages": [HumanMessage(content=enhanced_input)]})
@@ -245,6 +293,9 @@ class BaseAgent(ABC):
                 else:
                     output = ""
                 intermediate_steps = []
+
+                # Count tool calls from messages
+                tool_calls_count = sum(1 for msg in messages if hasattr(msg, 'tool_calls') and msg.tool_calls)
             else:
                 # Fallback to direct LLM call if no tools
                 system_prompt = self.get_system_prompt()
@@ -256,8 +307,35 @@ class BaseAgent(ABC):
                 output = response.content
                 intermediate_steps = []
 
+            # Estimate output tokens
+            output_tokens = len(output.split()) * 1.3
+
+            # Track costs
+            cost_usage = self.cost_tracker.track_usage(
+                agent_name=self.name,
+                model=self.config.model,
+                input_tokens=int(input_tokens),
+                output_tokens=int(output_tokens)
+            )
+
+            # Update legacy tracking
+            self.total_tokens_used += int(input_tokens + output_tokens)
+            self.total_cost += cost_usage.total_cost
+
             # Add to memory
             self.add_message_to_memory(AIMessage(content=output))
+
+            # Calculate execution time
+            execution_time = time.time() - start_time
+
+            # End performance monitoring
+            metrics = self.performance_monitor.end_execution(
+                execution_id=execution_id,
+                success=True,
+                tokens_used=int(input_tokens + output_tokens),
+                cost=cost_usage.total_cost,
+                tool_calls=tool_calls_count
+            )
 
             # Create response
             response = AgentResponse(
@@ -267,18 +345,49 @@ class BaseAgent(ABC):
                 intermediate_steps=intermediate_steps,
                 metadata={
                     "execution_count": self.execution_count,
-                    "tools_used": len(intermediate_steps),
+                    "execution_id": execution_id,
+                    "tools_used": tool_calls_count,
                     "context_provided": context is not None,
+                    "tokens_used": int(input_tokens + output_tokens),
+                    "cost": cost_usage.total_cost,
+                    "execution_time": execution_time,
                 },
             )
 
             logger.info(f"✅ Agent '{self.name}' completed successfully")
             logger.debug(f"Output: {output[:200]}...")
 
+            structured_logger.log_agent_execution(
+                agent_name=self.name,
+                action="run",
+                success=True,
+                duration=execution_time,
+                context=log_context,
+                tokens=int(input_tokens + output_tokens),
+                cost=cost_usage.total_cost,
+                tool_calls=tool_calls_count
+            )
+
             return response
 
         except Exception as e:
+            execution_time = time.time() - start_time
             logger.error(f"❌ Agent '{self.name}' execution failed: {e}", exc_info=True)
+
+            # End performance monitoring with error
+            self.performance_monitor.end_execution(
+                execution_id=execution_id,
+                success=False,
+                error=str(e)
+            )
+
+            structured_logger.error(
+                f"Agent execution failed",
+                error=e,
+                context=log_context,
+                execution_id=execution_id,
+                duration=execution_time
+            )
 
             response = AgentResponse(
                 output="",
@@ -287,6 +396,8 @@ class BaseAgent(ABC):
                 error=str(e),
                 metadata={
                     "execution_count": self.execution_count,
+                    "execution_id": execution_id,
+                    "execution_time": execution_time,
                 },
             )
 
