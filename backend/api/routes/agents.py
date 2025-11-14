@@ -13,6 +13,7 @@ import logging
 from database.database_manager import DatabaseManager
 from agents_framework.agents.email_analyst_agent import create_email_analyst_agent
 from agents_framework.agents.followup_agent import create_followup_agent
+from agents_framework.agents.job_hunter_agent import create_job_hunter_agent
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,130 @@ class AgentStatsResponse(BaseModel):
     tools_count: int
     memory_size: int
     uptime: Optional[str] = None
+
+
+# Follow-up Agent Request/Response Models
+class FollowUpTimingRequest(BaseModel):
+    """Request model for follow-up timing optimization"""
+    job_id: int = Field(..., description="Job application ID")
+    status: str = Field(..., description="Current application status")
+    days_since_contact: int = Field(..., description="Days since last contact")
+    application_date: str = Field(..., description="Application submission date")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_id": 123,
+                "status": "applied",
+                "days_since_contact": 8,
+                "application_date": "2025-11-01",
+                "metadata": {}
+            }
+        }
+
+
+class FollowUpDraftRequest(BaseModel):
+    """Request model for drafting follow-up messages"""
+    followup_type: str = Field(..., description="Type of follow-up")
+    company: str = Field(..., description="Company name")
+    position: str = Field(..., description="Job position")
+    tone: str = Field("professional", description="Message tone")
+    context_notes: str = Field("", description="Additional context")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "followup_type": "initial_application",
+                "company": "Google",
+                "position": "Software Engineer",
+                "tone": "professional",
+                "context_notes": "Applied via LinkedIn",
+                "metadata": {}
+            }
+        }
+
+
+class FollowUpStrategyRequest(BaseModel):
+    """Request model for follow-up strategy analysis"""
+    status: str = Field(..., description="Application status")
+    days_since_application: int = Field(..., description="Days since application")
+    response_history: str = Field(..., description="History of responses")
+    priority: str = Field("medium", description="Priority level")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "interview",
+                "days_since_application": 15,
+                "response_history": "positive",
+                "priority": "high",
+                "metadata": {}
+            }
+        }
+
+
+class FollowUpResponse(BaseModel):
+    """Response model for follow-up operations"""
+    success: bool
+    output: str
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+# Job Hunter Agent Models
+class JobSearchRequest(BaseModel):
+    """Request model for job search"""
+    keywords: str = Field(..., description="Job search keywords (e.g., 'Software Engineer', 'Data Scientist')")
+    location: str = Field("", description="Location filter (e.g., 'San Francisco, CA', 'Remote')")
+    platforms: Optional[List[str]] = Field(None, description="Platforms to search (LinkedIn, Indeed, Glassdoor)")
+    filters: Optional[Dict[str, Any]] = Field(None, description="Additional filters")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "keywords": "Software Engineer",
+                "location": "San Francisco, CA",
+                "platforms": ["LinkedIn", "Indeed"],
+                "filters": {
+                    "experience_level": "Mid-Senior level",
+                    "job_type": "Full-time",
+                    "salary_min": 120
+                }
+            }
+        }
+
+
+class JobRecommendationsRequest(BaseModel):
+    """Request model for job recommendations"""
+    user_id: int = Field(1, description="User ID to get recommendations for")
+    limit: int = Field(10, description="Maximum number of recommendations")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": 1,
+                "limit": 10
+            }
+        }
+
+
+class JobSearchResponse(BaseModel):
+    """Response model for job search"""
+    success: bool
+    analysis: str
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+class JobRecommendationsResponse(BaseModel):
+    """Response model for job recommendations"""
+    success: bool
+    analysis: str
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
 
 # Email Analyst Agent Endpoints
@@ -336,77 +461,6 @@ async def email_analyst_websocket(websocket: WebSocket):
             await websocket.close()
         except:
             pass
-
-
-# Follow-up Agent Request/Response Models
-class FollowUpTimingRequest(BaseModel):
-    """Request model for follow-up timing optimization"""
-    job_id: int = Field(..., description="Job application ID")
-    status: str = Field(..., description="Current application status")
-    days_since_contact: int = Field(..., description="Days since last contact")
-    application_date: str = Field(..., description="Application submission date")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "job_id": 123,
-                "status": "applied",
-                "days_since_contact": 8,
-                "application_date": "2025-11-01",
-                "metadata": {}
-            }
-        }
-
-
-class FollowUpDraftRequest(BaseModel):
-    """Request model for drafting follow-up messages"""
-    followup_type: str = Field(..., description="Type of follow-up")
-    company: str = Field(..., description="Company name")
-    position: str = Field(..., description="Job position")
-    tone: str = Field("professional", description="Message tone")
-    context_notes: str = Field("", description="Additional context")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "followup_type": "initial_application",
-                "company": "Google",
-                "position": "Software Engineer",
-                "tone": "professional",
-                "context_notes": "Applied via LinkedIn",
-                "metadata": {}
-            }
-        }
-
-
-class FollowUpStrategyRequest(BaseModel):
-    """Request model for follow-up strategy analysis"""
-    status: str = Field(..., description="Application status")
-    days_since_application: int = Field(..., description="Days since application")
-    response_history: str = Field(..., description="History of responses")
-    priority: str = Field("medium", description="Priority level")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "status": "interview",
-                "days_since_application": 15,
-                "response_history": "positive",
-                "priority": "high",
-                "metadata": {}
-            }
-        }
-
-
-class FollowUpResponse(BaseModel):
-    """Response model for follow-up operations"""
-    success: bool
-    output: str
-    metadata: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
 
 
 # Follow-up Agent Endpoints
@@ -722,11 +776,235 @@ async def followup_agent_websocket(websocket: WebSocket):
             pass
 
 
+# Job Hunter Agent Endpoints
+@router.post("/job-hunter/search", response_model=JobSearchResponse)
+async def search_jobs(
+    request: JobSearchRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Search for jobs across multiple platforms using the Job Hunter Agent.
+
+    This endpoint uses AI to:
+    - Search LinkedIn, Indeed, and Glassdoor for job listings
+    - Extract job details and requirements
+    - Match jobs to user preferences
+    - Calculate match scores
+    - Research companies
+    - Save high-quality recommendations
+
+    Returns comprehensive job search results with rankings.
+    """
+    try:
+        logger.info(f"🔍 Job Hunter: Searching for '{request.keywords}' jobs in '{request.location or 'any location'}'")
+
+        # Create agent
+        agent = create_job_hunter_agent(db)
+
+        # Search for jobs
+        result = await agent.search_jobs(
+            keywords=request.keywords,
+            location=request.location,
+            platforms=request.platforms,
+            filters=request.filters
+        )
+
+        logger.info(f"✅ Job search {'successful' if result['success'] else 'failed'}")
+
+        return JobSearchResponse(**result)
+
+    except Exception as e:
+        logger.error(f"❌ Error in job search: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error searching for jobs: {str(e)}"
+        )
+
+
+@router.post("/job-hunter/recommendations", response_model=JobRecommendationsResponse)
+async def get_job_recommendations(
+    request: JobRecommendationsRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Get personalized job recommendations using the Job Hunter Agent.
+
+    This endpoint uses AI to:
+    - Analyze user preferences and profile
+    - Search multiple job boards
+    - Calculate match scores for all jobs
+    - Research companies
+    - Rank and filter recommendations
+
+    Returns top job recommendations tailored to the user's preferences.
+    """
+    try:
+        logger.info(f"💼 Job Hunter: Getting recommendations for user {request.user_id}")
+
+        # Create agent
+        agent = create_job_hunter_agent(db)
+
+        # Get recommendations
+        result = await agent.get_recommendations(
+            user_id=request.user_id,
+            limit=request.limit
+        )
+
+        logger.info(f"✅ Job recommendations {'successful' if result['success'] else 'failed'}")
+
+        return JobRecommendationsResponse(**result)
+
+    except Exception as e:
+        logger.error(f"❌ Error getting job recommendations: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting job recommendations: {str(e)}"
+        )
+
+
+@router.get("/job-hunter/stats", response_model=AgentStatsResponse)
+async def get_job_hunter_stats(db: DatabaseManager = Depends(get_db)):
+    """
+    Get statistics and status information for the Job Hunter Agent.
+
+    Returns:
+    - Agent name and configuration
+    - Number of executions
+    - Available tools count
+    - Memory usage
+    - Performance metrics
+    """
+    try:
+        logger.info("📊 Job Hunter: Getting agent statistics")
+
+        # Create agent
+        agent = create_job_hunter_agent(db)
+
+        # Get statistics
+        stats = agent.get_stats()
+
+        return AgentStatsResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"❌ Error getting agent stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving agent statistics: {str(e)}"
+        )
+
+
+# WebSocket endpoint for real-time job search
+@router.websocket("/job-hunter/ws")
+async def job_hunter_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time job search and recommendations.
+
+    Allows streaming job search results as the agent processes them.
+
+    Message format:
+    - Client sends: {"type": "search", "data": {"keywords": "...", "location": "...", ...}}
+    - Client sends: {"type": "recommendations", "data": {"user_id": 1, "limit": 10}}
+    - Server sends: {"type": "search_progress", "data": {...}} (during processing)
+    - Server sends: {"type": "search_complete", "data": {...}} (when done)
+    """
+    await websocket.accept()
+    logger.info("🔌 Job Hunter WebSocket connection established")
+
+    try:
+        db = DatabaseManager()
+        agent = create_job_hunter_agent(db)
+
+        while True:
+            # Receive message from client
+            data = await websocket.receive_json()
+
+            message_type = data.get("type")
+
+            if message_type == "search":
+                search_data = data.get("data", {})
+
+                # Send acknowledgment
+                await websocket.send_json({
+                    "type": "search_started",
+                    "data": {"timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    # Perform job search
+                    result = await agent.search_jobs(
+                        keywords=search_data.get("keywords", ""),
+                        location=search_data.get("location", ""),
+                        platforms=search_data.get("platforms"),
+                        filters=search_data.get("filters")
+                    )
+
+                    # Send complete result
+                    await websocket.send_json({
+                        "type": "search_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket search: {e}")
+                    await websocket.send_json({
+                        "type": "search_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "recommendations":
+                rec_data = data.get("data", {})
+
+                # Send acknowledgment
+                await websocket.send_json({
+                    "type": "recommendations_started",
+                    "data": {"timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    # Get recommendations
+                    result = await agent.get_recommendations(
+                        user_id=rec_data.get("user_id", 1),
+                        limit=rec_data.get("limit", 10)
+                    )
+
+                    # Send complete result
+                    await websocket.send_json({
+                        "type": "recommendations_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket recommendations: {e}")
+                    await websocket.send_json({
+                        "type": "recommendations_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "ping":
+                # Heartbeat
+                await websocket.send_json({
+                    "type": "pong",
+                    "data": {"timestamp": datetime.now().isoformat()}
+                })
+
+            else:
+                await websocket.send_json({
+                    "type": "error",
+                    "data": {"error": f"Unknown message type: {message_type}"}
+                })
+
+    except WebSocketDisconnect:
+        logger.info("🔌 Job Hunter WebSocket connection closed")
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
 # Future agent endpoints can be added here
 # Example structure for other agents:
 
 # @router.post("/application-manager/analyze")
 # async def analyze_application(...)
-#
-# @router.post("/job-hunter/search")
-# async def search_jobs(...)
