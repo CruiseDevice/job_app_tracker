@@ -18,7 +18,7 @@ from langchain.tools import tool
 from langchain_core.messages import SystemMessage
 
 from ..core.base_agent import BaseAgent, AgentConfig, AgentResponse
-from ...database import DatabaseManager
+from database.database_manager import DatabaseManager
 
 
 class AnalyticsAgent(BaseAgent):

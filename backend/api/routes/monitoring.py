@@ -7,8 +7,8 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 
-from ...agents_framework.monitoring.performance_monitor import global_performance_monitor
-from ...agents_framework.monitoring.cost_tracker import global_cost_tracker
+from agents_framework.monitoring.performance_monitor import global_performance_monitor
+from agents_framework.monitoring.cost_tracker import global_cost_tracker
 
 router = APIRouter()
 
