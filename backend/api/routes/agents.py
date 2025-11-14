@@ -12,6 +12,7 @@ import logging
 
 from database.database_manager import DatabaseManager
 from agents_framework.agents.email_analyst_agent import create_email_analyst_agent
+from agents_framework.agents.followup_agent import create_followup_agent
 
 logger = logging.getLogger(__name__)
 
@@ -337,14 +338,395 @@ async def email_analyst_websocket(websocket: WebSocket):
             pass
 
 
+# Follow-up Agent Request/Response Models
+class FollowUpTimingRequest(BaseModel):
+    """Request model for follow-up timing optimization"""
+    job_id: int = Field(..., description="Job application ID")
+    status: str = Field(..., description="Current application status")
+    days_since_contact: int = Field(..., description="Days since last contact")
+    application_date: str = Field(..., description="Application submission date")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_id": 123,
+                "status": "applied",
+                "days_since_contact": 8,
+                "application_date": "2025-11-01",
+                "metadata": {}
+            }
+        }
+
+
+class FollowUpDraftRequest(BaseModel):
+    """Request model for drafting follow-up messages"""
+    followup_type: str = Field(..., description="Type of follow-up")
+    company: str = Field(..., description="Company name")
+    position: str = Field(..., description="Job position")
+    tone: str = Field("professional", description="Message tone")
+    context_notes: str = Field("", description="Additional context")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "followup_type": "initial_application",
+                "company": "Google",
+                "position": "Software Engineer",
+                "tone": "professional",
+                "context_notes": "Applied via LinkedIn",
+                "metadata": {}
+            }
+        }
+
+
+class FollowUpStrategyRequest(BaseModel):
+    """Request model for follow-up strategy analysis"""
+    status: str = Field(..., description="Application status")
+    days_since_application: int = Field(..., description="Days since application")
+    response_history: str = Field(..., description="History of responses")
+    priority: str = Field("medium", description="Priority level")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "interview",
+                "days_since_application": 15,
+                "response_history": "positive",
+                "priority": "high",
+                "metadata": {}
+            }
+        }
+
+
+class FollowUpResponse(BaseModel):
+    """Response model for follow-up operations"""
+    success: bool
+    output: str
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+# Follow-up Agent Endpoints
+@router.post("/followup-agent/optimize-timing", response_model=FollowUpResponse)
+async def optimize_followup_timing(
+    request: FollowUpTimingRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Optimize the timing for sending a follow-up email.
+
+    This endpoint uses AI to:
+    - Analyze current application stage
+    - Calculate optimal send time based on best practices
+    - Consider response patterns and timing rules
+    - Recommend specific dates and times
+    - Provide reasoning for recommendations
+
+    Returns timing recommendations with confidence scores.
+    """
+    try:
+        logger.info(f"⏰ Follow-up Agent: Optimizing timing for job #{request.job_id}")
+
+        # Create agent
+        agent = create_followup_agent(db)
+
+        # Optimize timing
+        result = await agent.optimize_followup_timing(
+            job_id=request.job_id,
+            status=request.status,
+            days_since_contact=request.days_since_contact,
+            application_date=request.application_date,
+            metadata=request.metadata
+        )
+
+        logger.info(f"✅ Timing optimization {'successful' if result['success'] else 'failed'}")
+
+        return FollowUpResponse(
+            success=result['success'],
+            output=result.get('recommendations', ''),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in timing optimization: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error optimizing follow-up timing: {str(e)}"
+        )
+
+
+@router.post("/followup-agent/draft-message", response_model=FollowUpResponse)
+async def draft_followup_message(
+    request: FollowUpDraftRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Draft a personalized follow-up message.
+
+    This endpoint uses AI to:
+    - Create personalized message content
+    - Match tone to company culture and situation
+    - Include relevant context and details
+    - Provide subject line suggestions
+    - Offer customization tips
+
+    Returns a complete, ready-to-send follow-up email.
+    """
+    try:
+        logger.info(f"✉️ Follow-up Agent: Drafting {request.followup_type} message for {request.company}")
+
+        # Create agent
+        agent = create_followup_agent(db)
+
+        # Draft message
+        result = await agent.draft_followup(
+            followup_type=request.followup_type,
+            company=request.company,
+            position=request.position,
+            tone=request.tone,
+            context_notes=request.context_notes,
+            metadata=request.metadata
+        )
+
+        logger.info(f"✅ Message drafting {'successful' if result['success'] else 'failed'}")
+
+        return FollowUpResponse(
+            success=result['success'],
+            output=result.get('message', ''),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in message drafting: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error drafting follow-up message: {str(e)}"
+        )
+
+
+@router.post("/followup-agent/analyze-strategy", response_model=FollowUpResponse)
+async def analyze_followup_strategy(
+    request: FollowUpStrategyRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Analyze and suggest a comprehensive follow-up strategy.
+
+    This endpoint uses AI to:
+    - Analyze response history and patterns
+    - Recommend a complete follow-up sequence
+    - Optimize timing for each follow-up
+    - Provide message guidelines
+    - Set realistic success metrics
+
+    Returns a data-driven, multi-step follow-up plan.
+    """
+    try:
+        logger.info(f"🎯 Follow-up Agent: Analyzing strategy for {request.status} application")
+
+        # Create agent
+        agent = create_followup_agent(db)
+
+        # Analyze strategy
+        result = await agent.analyze_strategy(
+            status=request.status,
+            days_since_application=request.days_since_application,
+            response_history=request.response_history,
+            priority=request.priority,
+            metadata=request.metadata
+        )
+
+        logger.info(f"✅ Strategy analysis {'successful' if result['success'] else 'failed'}")
+
+        return FollowUpResponse(
+            success=result['success'],
+            output=result.get('strategy', ''),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in strategy analysis: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing follow-up strategy: {str(e)}"
+        )
+
+
+@router.get("/followup-agent/stats", response_model=AgentStatsResponse)
+async def get_followup_agent_stats(db: DatabaseManager = Depends(get_db)):
+    """
+    Get statistics and status information for the Follow-up Agent.
+
+    Returns:
+    - Agent name and configuration
+    - Number of executions
+    - Available tools count
+    - Memory usage
+    - Performance metrics
+    """
+    try:
+        logger.info("📊 Follow-up Agent: Getting agent statistics")
+
+        # Create agent
+        agent = create_followup_agent(db)
+
+        # Get statistics
+        stats = agent.get_stats()
+
+        return AgentStatsResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"❌ Error getting agent stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving agent statistics: {str(e)}"
+        )
+
+
+# WebSocket endpoint for real-time follow-up operations
+@router.websocket("/followup-agent/ws")
+async def followup_agent_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time follow-up operations.
+
+    Allows streaming results as the agent processes requests.
+
+    Message format:
+    - Client sends: {"type": "optimize_timing", "data": {...}}
+    - Client sends: {"type": "draft_message", "data": {...}}
+    - Client sends: {"type": "analyze_strategy", "data": {...}}
+    - Server sends: {"type": "operation_complete", "data": {...}}
+    """
+    await websocket.accept()
+    logger.info("🔌 Follow-up Agent WebSocket connection established")
+
+    try:
+        db = DatabaseManager()
+        agent = create_followup_agent(db)
+
+        while True:
+            # Receive message from client
+            data = await websocket.receive_json()
+
+            message_type = data.get("type")
+            request_data = data.get("data", {})
+
+            if message_type == "optimize_timing":
+                # Send acknowledgment
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "timing_optimization", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.optimize_followup_timing(
+                        job_id=request_data.get("job_id"),
+                        status=request_data.get("status"),
+                        days_since_contact=request_data.get("days_since_contact"),
+                        application_date=request_data.get("application_date"),
+                        metadata=request_data.get("metadata")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket timing optimization: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "draft_message":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "message_drafting", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.draft_followup(
+                        followup_type=request_data.get("followup_type"),
+                        company=request_data.get("company"),
+                        position=request_data.get("position"),
+                        tone=request_data.get("tone", "professional"),
+                        context_notes=request_data.get("context_notes", ""),
+                        metadata=request_data.get("metadata")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket message drafting: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "analyze_strategy":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "strategy_analysis", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.analyze_strategy(
+                        status=request_data.get("status"),
+                        days_since_application=request_data.get("days_since_application"),
+                        response_history=request_data.get("response_history"),
+                        priority=request_data.get("priority", "medium"),
+                        metadata=request_data.get("metadata")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket strategy analysis: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "ping":
+                await websocket.send_json({
+                    "type": "pong",
+                    "data": {"timestamp": datetime.now().isoformat()}
+                })
+
+            else:
+                await websocket.send_json({
+                    "type": "error",
+                    "data": {"error": f"Unknown message type: {message_type}"}
+                })
+
+    except WebSocketDisconnect:
+        logger.info("🔌 Follow-up Agent WebSocket connection closed")
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
 # Future agent endpoints can be added here
 # Example structure for other agents:
 
 # @router.post("/application-manager/analyze")
 # async def analyze_application(...)
-#
-# @router.post("/followup-agent/generate")
-# async def generate_followup(...)
 #
 # @router.post("/job-hunter/search")
 # async def search_jobs(...)
