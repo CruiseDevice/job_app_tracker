@@ -607,3 +607,474 @@ class FollowUpStatistics(Base):
         if self.followups_sent == 0:
             return 0.0
         return self.responses_received / self.followups_sent
+
+
+# INTERVIEW PREP AGENT MODELS
+
+class InterviewPrepRecord(Base):
+    """
+    Track interview preparation sessions for job applications
+    """
+    __tablename__ = "interview_prep_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey('job_applications.id'), nullable=False, index=True)
+
+    # Interview details
+    interview_date = Column(DateTime, index=True)
+    interview_type = Column(String)  # phone, video, in-person, technical, behavioral, panel, final
+    interview_round = Column(Integer, default=1)  # 1st round, 2nd round, etc.
+    interviewer_name = Column(String)
+    interviewer_title = Column(String)
+    interviewer_linkedin = Column(Text)
+
+    # Preparation status
+    preparation_status = Column(String, default="in_progress")  # in_progress, completed, interview_done
+    preparation_level = Column(String)  # basic, intermediate, advanced
+    confidence_level = Column(Integer, default=5)  # 1-10 scale
+
+    # Content prepared
+    company_research_completed = Column(Boolean, default=False)
+    questions_prepared_count = Column(Integer, default=0)
+    star_stories_prepared_count = Column(Integer, default=0)
+    mock_interviews_completed = Column(Integer, default=0)
+
+    # Research notes
+    company_research_notes = Column(Text)  # Company background, culture, values
+    role_analysis_notes = Column(Text)  # Key responsibilities, required skills
+    interviewer_research_notes = Column(Text)  # Interviewer background from LinkedIn
+
+    # Preparation plan
+    preparation_checklist = Column(Text)  # JSON array of checklist items
+    focus_areas = Column(Text)  # JSON array of key areas to focus on
+    questions_to_ask = Column(Text)  # JSON array of questions to ask interviewer
+
+    # Outcomes (after interview)
+    interview_completed = Column(Boolean, default=False)
+    interview_completion_date = Column(DateTime)
+    actual_questions_asked = Column(Text)  # JSON array of actual questions asked
+    performance_notes = Column(Text)  # How the interview went
+    follow_up_required = Column(Boolean, default=False)
+
+    # Agent metadata
+    created_by_agent = Column(Boolean, default=True)
+    agent_preparation_plan = Column(Text)  # Full preparation plan from agent
+    times_practiced = Column(Integer, default=0)
+
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "job_id": self.job_id,
+            "interview_date": self.interview_date.isoformat() if self.interview_date else None,
+            "interview_type": self.interview_type,
+            "interview_round": self.interview_round,
+            "interviewer_name": self.interviewer_name,
+            "interviewer_title": self.interviewer_title,
+            "interviewer_linkedin": self.interviewer_linkedin,
+            "preparation_status": self.preparation_status,
+            "preparation_level": self.preparation_level,
+            "confidence_level": self.confidence_level,
+            "company_research_completed": self.company_research_completed,
+            "questions_prepared_count": self.questions_prepared_count,
+            "star_stories_prepared_count": self.star_stories_prepared_count,
+            "mock_interviews_completed": self.mock_interviews_completed,
+            "company_research_notes": self.company_research_notes,
+            "role_analysis_notes": self.role_analysis_notes,
+            "interviewer_research_notes": self.interviewer_research_notes,
+            "preparation_checklist": json.loads(self.preparation_checklist) if self.preparation_checklist else [],
+            "focus_areas": json.loads(self.focus_areas) if self.focus_areas else [],
+            "questions_to_ask": json.loads(self.questions_to_ask) if self.questions_to_ask else [],
+            "interview_completed": self.interview_completed,
+            "interview_completion_date": self.interview_completion_date.isoformat() if self.interview_completion_date else None,
+            "actual_questions_asked": json.loads(self.actual_questions_asked) if self.actual_questions_asked else [],
+            "performance_notes": self.performance_notes,
+            "follow_up_required": self.follow_up_required,
+            "created_by_agent": self.created_by_agent,
+            "agent_preparation_plan": self.agent_preparation_plan,
+            "times_practiced": self.times_practiced,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def is_upcoming(self) -> bool:
+        """Check if interview is upcoming"""
+        return self.interview_date and self.interview_date > datetime.now()
+
+    def days_until_interview(self) -> int:
+        """Calculate days until interview"""
+        if not self.interview_date:
+            return 0
+        delta = self.interview_date - datetime.now()
+        return max(0, delta.days)
+
+    def is_well_prepared(self) -> bool:
+        """Check if candidate is well prepared"""
+        return (
+            self.company_research_completed and
+            self.questions_prepared_count >= 5 and
+            self.star_stories_prepared_count >= 3 and
+            self.mock_interviews_completed >= 1
+        )
+
+
+class InterviewQuestion(Base):
+    """
+    Store generated or encountered interview questions
+    """
+    __tablename__ = "interview_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prep_record_id = Column(Integer, ForeignKey('interview_prep_records.id'), index=True)
+    job_id = Column(Integer, ForeignKey('job_applications.id'), index=True)
+
+    # Question details
+    question_text = Column(Text, nullable=False)
+    question_type = Column(String, nullable=False)  # behavioral, technical, situational, company-fit
+    difficulty_level = Column(String, default="medium")  # easy, medium, hard
+    question_category = Column(String)  # leadership, teamwork, problem-solving, etc.
+
+    # Answer preparation
+    has_prepared_answer = Column(Boolean, default=False)
+    star_situation = Column(Text)  # Situation part of STAR answer
+    star_task = Column(Text)  # Task part
+    star_action = Column(Text)  # Action part
+    star_result = Column(Text)  # Result part
+    full_answer_notes = Column(Text)  # Complete answer notes
+
+    # Metadata
+    focus_area = Column(String)  # Key skill this question tests
+    tips_for_answering = Column(Text)  # Tips for answering this question
+    example_answer = Column(Text)  # Example/template answer
+
+    # Practice tracking
+    times_practiced = Column(Integer, default=0)
+    confidence_rating = Column(Integer, default=5)  # 1-10 how confident in answer
+
+    # Actual interview
+    was_asked_in_interview = Column(Boolean, default=False)
+    actual_answer_given = Column(Text)  # What was actually said
+    answer_went_well = Column(Boolean)
+
+    # Source
+    generated_by_agent = Column(Boolean, default=True)
+    source = Column(String, default="agent")  # agent, user, actual_interview
+
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "prep_record_id": self.prep_record_id,
+            "job_id": self.job_id,
+            "question_text": self.question_text,
+            "question_type": self.question_type,
+            "difficulty_level": self.difficulty_level,
+            "question_category": self.question_category,
+            "has_prepared_answer": self.has_prepared_answer,
+            "star_situation": self.star_situation,
+            "star_task": self.star_task,
+            "star_action": self.star_action,
+            "star_result": self.star_result,
+            "full_answer_notes": self.full_answer_notes,
+            "focus_area": self.focus_area,
+            "tips_for_answering": self.tips_for_answering,
+            "example_answer": self.example_answer,
+            "times_practiced": self.times_practiced,
+            "confidence_rating": self.confidence_rating,
+            "was_asked_in_interview": self.was_asked_in_interview,
+            "actual_answer_given": self.actual_answer_given,
+            "answer_went_well": self.answer_went_well,
+            "generated_by_agent": self.generated_by_agent,
+            "source": self.source,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def get_star_answer(self) -> str:
+        """Get formatted STAR answer"""
+        parts = []
+        if self.star_situation:
+            parts.append(f"SITUATION: {self.star_situation}")
+        if self.star_task:
+            parts.append(f"TASK: {self.star_task}")
+        if self.star_action:
+            parts.append(f"ACTION: {self.star_action}")
+        if self.star_result:
+            parts.append(f"RESULT: {self.star_result}")
+        return "\n\n".join(parts) if parts else self.full_answer_notes or ""
+
+    def is_well_prepared(self) -> bool:
+        """Check if question has a good prepared answer"""
+        return (
+            self.has_prepared_answer and
+            self.confidence_rating >= 7 and
+            (self.star_situation or self.full_answer_notes)
+        )
+
+
+class MockInterviewSession(Base):
+    """
+    Track mock interview practice sessions
+    """
+    __tablename__ = "mock_interview_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prep_record_id = Column(Integer, ForeignKey('interview_prep_records.id'), index=True)
+    job_id = Column(Integer, ForeignKey('job_applications.id'), index=True)
+
+    # Session details
+    session_date = Column(DateTime, nullable=False, server_default=func.now())
+    session_duration_minutes = Column(Integer)
+    session_type = Column(String)  # solo_practice, with_friend, recorded, live_agent
+    focus_area = Column(String)  # behavioral, technical, company-fit, general
+    difficulty_level = Column(String, default="medium")  # entry, medium, senior
+
+    # Questions asked
+    questions_asked_count = Column(Integer, default=0)
+    questions_asked = Column(Text)  # JSON array of question IDs or texts
+
+    # Performance
+    overall_performance = Column(String)  # excellent, good, needs_improvement, poor
+    performance_score = Column(Integer)  # 1-10
+    strengths_identified = Column(Text)  # JSON array of strengths
+    areas_for_improvement = Column(Text)  # JSON array of improvement areas
+
+    # Detailed feedback
+    feedback_notes = Column(Text)
+    specific_questions_struggled = Column(Text)  # JSON array
+    questions_answered_well = Column(Text)  # JSON array
+
+    # Practice metrics
+    average_answer_length_seconds = Column(Integer)
+    used_star_format = Column(Boolean, default=False)
+    examples_were_specific = Column(Boolean, default=False)
+    maintained_good_pace = Column(Boolean, default=False)
+
+    # Next steps
+    recommended_next_practice = Column(DateTime)
+    recommended_focus = Column(Text)  # What to focus on next
+
+    # Recording/notes
+    has_recording = Column(Boolean, default=False)
+    recording_url = Column(Text)
+    practice_notes = Column(Text)
+
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "prep_record_id": self.prep_record_id,
+            "job_id": self.job_id,
+            "session_date": self.session_date.isoformat() if self.session_date else None,
+            "session_duration_minutes": self.session_duration_minutes,
+            "session_type": self.session_type,
+            "focus_area": self.focus_area,
+            "difficulty_level": self.difficulty_level,
+            "questions_asked_count": self.questions_asked_count,
+            "questions_asked": json.loads(self.questions_asked) if self.questions_asked else [],
+            "overall_performance": self.overall_performance,
+            "performance_score": self.performance_score,
+            "strengths_identified": json.loads(self.strengths_identified) if self.strengths_identified else [],
+            "areas_for_improvement": json.loads(self.areas_for_improvement) if self.areas_for_improvement else [],
+            "feedback_notes": self.feedback_notes,
+            "specific_questions_struggled": json.loads(self.specific_questions_struggled) if self.specific_questions_struggled else [],
+            "questions_answered_well": json.loads(self.questions_answered_well) if self.questions_answered_well else [],
+            "average_answer_length_seconds": self.average_answer_length_seconds,
+            "used_star_format": self.used_star_format,
+            "examples_were_specific": self.examples_were_specific,
+            "maintained_good_pace": self.maintained_good_pace,
+            "recommended_next_practice": self.recommended_next_practice.isoformat() if self.recommended_next_practice else None,
+            "recommended_focus": self.recommended_focus,
+            "has_recording": self.has_recording,
+            "recording_url": self.recording_url,
+            "practice_notes": self.practice_notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def is_recent(self) -> bool:
+        """Check if session was in last 7 days"""
+        if not self.session_date:
+            return False
+        delta = datetime.now() - self.session_date
+        return delta.days <= 7
+
+    def performance_rating(self) -> str:
+        """Get human-readable performance rating"""
+        if not self.performance_score:
+            return "Not Rated"
+        if self.performance_score >= 8:
+            return "Excellent"
+        elif self.performance_score >= 6:
+            return "Good"
+        elif self.performance_score >= 4:
+            return "Needs Improvement"
+        else:
+            return "Poor"
+
+
+class InterviewTip(Base):
+    """
+    Store interview tips and best practices
+    """
+    __tablename__ = "interview_tips"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Tip details
+    tip_category = Column(String, nullable=False, index=True)  # preparation, during_interview, after_interview, body_language, etc.
+    interview_stage = Column(String, index=True)  # phone-screen, technical, behavioral, panel, final, general
+    role_level = Column(String)  # entry, mid, senior, executive
+
+    # Content
+    tip_title = Column(String, nullable=False)
+    tip_content = Column(Text, nullable=False)
+    tip_importance = Column(String, default="medium")  # high, medium, low
+
+    # Examples
+    example_scenario = Column(Text)
+    what_to_do = Column(Text)
+    what_to_avoid = Column(Text)
+
+    # Metadata
+    source = Column(String, default="agent")  # agent, user, industry_best_practice
+    is_verified = Column(Boolean, default=True)
+    applies_to_industries = Column(Text)  # JSON array of industries
+
+    # Usage tracking
+    times_viewed = Column(Integer, default=0)
+    times_helpful = Column(Integer, default=0)
+    helpfulness_rating = Column(Float)
+
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "tip_category": self.tip_category,
+            "interview_stage": self.interview_stage,
+            "role_level": self.role_level,
+            "tip_title": self.tip_title,
+            "tip_content": self.tip_content,
+            "tip_importance": self.tip_importance,
+            "example_scenario": self.example_scenario,
+            "what_to_do": self.what_to_do,
+            "what_to_avoid": self.what_to_avoid,
+            "source": self.source,
+            "is_verified": self.is_verified,
+            "applies_to_industries": json.loads(self.applies_to_industries) if self.applies_to_industries else [],
+            "times_viewed": self.times_viewed,
+            "times_helpful": self.times_helpful,
+            "helpfulness_rating": self.helpfulness_rating,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def is_highly_rated(self) -> bool:
+        """Check if tip is highly rated"""
+        return self.helpfulness_rating and self.helpfulness_rating >= 4.0
+
+
+class InterviewStatistics(Base):
+    """
+    Track interview preparation and performance statistics
+    """
+    __tablename__ = "interview_statistics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(DateTime, nullable=False, index=True)
+
+    # Preparation metrics
+    prep_sessions_started = Column(Integer, default=0)
+    prep_sessions_completed = Column(Integer, default=0)
+    total_questions_generated = Column(Integer, default=0)
+    total_star_answers_prepared = Column(Integer, default=0)
+    mock_interviews_conducted = Column(Integer, default=0)
+
+    # Interview metrics
+    interviews_scheduled = Column(Integer, default=0)
+    interviews_completed = Column(Integer, default=0)
+    interviews_successful = Column(Integer, default=0)  # Led to next round or offer
+
+    # Performance metrics
+    average_preparation_time_hours = Column(Float)
+    average_confidence_level = Column(Float)  # 1-10 scale
+    average_mock_interview_score = Column(Float)  # 1-10 scale
+
+    # Effectiveness metrics
+    prepared_questions_asked_rate = Column(Float)  # How often prepared questions were actually asked
+    star_format_success_rate = Column(Float)  # When using STAR, how often it worked well
+
+    # By interview type
+    phone_screens = Column(Integer, default=0)
+    technical_interviews = Column(Integer, default=0)
+    behavioral_interviews = Column(Integer, default=0)
+    panel_interviews = Column(Integer, default=0)
+    final_interviews = Column(Integer, default=0)
+
+    # Outcomes
+    offers_received = Column(Integer, default=0)
+    rejections_received = Column(Integer, default=0)
+    still_in_process = Column(Integer, default=0)
+
+    # Agent usage
+    agent_prep_plans_generated = Column(Integer, default=0)
+    agent_tips_viewed = Column(Integer, default=0)
+
+    created_at = Column(DateTime, server_default=func.now())
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "date": self.date.isoformat() if self.date else None,
+            "prep_sessions_started": self.prep_sessions_started,
+            "prep_sessions_completed": self.prep_sessions_completed,
+            "total_questions_generated": self.total_questions_generated,
+            "total_star_answers_prepared": self.total_star_answers_prepared,
+            "mock_interviews_conducted": self.mock_interviews_conducted,
+            "interviews_scheduled": self.interviews_scheduled,
+            "interviews_completed": self.interviews_completed,
+            "interviews_successful": self.interviews_successful,
+            "average_preparation_time_hours": self.average_preparation_time_hours,
+            "average_confidence_level": self.average_confidence_level,
+            "average_mock_interview_score": self.average_mock_interview_score,
+            "prepared_questions_asked_rate": self.prepared_questions_asked_rate,
+            "star_format_success_rate": self.star_format_success_rate,
+            "phone_screens": self.phone_screens,
+            "technical_interviews": self.technical_interviews,
+            "behavioral_interviews": self.behavioral_interviews,
+            "panel_interviews": self.panel_interviews,
+            "final_interviews": self.final_interviews,
+            "offers_received": self.offers_received,
+            "rejections_received": self.rejections_received,
+            "still_in_process": self.still_in_process,
+            "agent_prep_plans_generated": self.agent_prep_plans_generated,
+            "agent_tips_viewed": self.agent_tips_viewed,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def calculate_success_rate(self) -> float:
+        """Calculate interview success rate"""
+        if self.interviews_completed == 0:
+            return 0.0
+        return self.interviews_successful / self.interviews_completed
+
+    def calculate_completion_rate(self) -> float:
+        """Calculate preparation completion rate"""
+        if self.prep_sessions_started == 0:
+            return 0.0
+        return self.prep_sessions_completed / self.prep_sessions_started

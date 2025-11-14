@@ -15,6 +15,7 @@ from agents_framework.agents.email_analyst_agent import create_email_analyst_age
 from agents_framework.agents.followup_agent import create_followup_agent
 from agents_framework.agents.job_hunter_agent import create_job_hunter_agent
 from agents_framework.agents.resume_writer_agent import create_resume_writer_agent
+from agents_framework.agents.interview_prep_agent import create_interview_prep_agent
 
 logger = logging.getLogger(__name__)
 
@@ -1372,8 +1373,559 @@ async def resume_writer_websocket(websocket: WebSocket):
             pass
 
 
-# Future agent endpoints can be added here
-# Example structure for other agents:
+# ============================================================================
+# INTERVIEW PREP AGENT ENDPOINTS
+# ============================================================================
 
-# @router.post("/application-manager/analyze")
-# async def analyze_application(...)
+# Interview Prep Agent Request/Response Models
+
+class InterviewPrepRequest(BaseModel):
+    """Request model for comprehensive interview preparation"""
+    job_id: Optional[int] = Field(None, description="Job application ID")
+    company_name: str = Field(..., description="Company name")
+    job_title: str = Field(..., description="Job title/position")
+    job_description: str = Field("", description="Full job description")
+    interview_date: Optional[str] = Field(None, description="Interview date (YYYY-MM-DD)")
+    interview_type: str = Field("general", description="Interview type: phone, video, in-person, technical, behavioral, panel, final")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_id": 123,
+                "company_name": "Google",
+                "job_title": "Senior Software Engineer",
+                "job_description": "We are looking for a senior software engineer...",
+                "interview_date": "2025-12-01",
+                "interview_type": "technical",
+                "metadata": {}
+            }
+        }
+
+
+class QuestionGenerationRequest(BaseModel):
+    """Request model for generating interview questions"""
+    job_title: str = Field(..., description="Job title/position")
+    job_description: str = Field("", description="Job description")
+    company_name: str = Field("", description="Company name")
+    question_type: str = Field("mixed", description="Type: behavioral, technical, situational, or mixed")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_title": "Product Manager",
+                "job_description": "Lead product strategy and development...",
+                "company_name": "Microsoft",
+                "question_type": "mixed",
+                "metadata": {}
+            }
+        }
+
+
+class STARAnswerRequest(BaseModel):
+    """Request model for STAR format answer preparation"""
+    question: str = Field(..., description="The interview question to answer")
+    experience_context: str = Field("", description="Optional context about relevant experience")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "question": "Tell me about a time when you faced a significant challenge at work",
+                "experience_context": "I worked on a complex microservices migration project",
+                "metadata": {}
+            }
+        }
+
+
+class MockInterviewRequest(BaseModel):
+    """Request model for starting a mock interview"""
+    job_title: str = Field(..., description="Job title/position")
+    focus_area: str = Field("general", description="Focus area: behavioral, technical, company-fit, or general")
+    difficulty: str = Field("medium", description="Difficulty: entry, medium, or senior")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_title": "Data Scientist",
+                "focus_area": "technical",
+                "difficulty": "senior",
+                "metadata": {}
+            }
+        }
+
+
+class InterviewTipsRequest(BaseModel):
+    """Request model for getting interview tips"""
+    interview_stage: str = Field("general", description="Interview stage: phone-screen, technical, behavioral, panel, final, or general")
+    role_level: str = Field("mid", description="Role level: entry, mid, senior, or executive")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "interview_stage": "technical",
+                "role_level": "senior",
+                "metadata": {}
+            }
+        }
+
+
+class InterviewChecklistRequest(BaseModel):
+    """Request model for getting interview checklist"""
+    interview_date: str = Field("", description="Interview date (YYYY-MM-DD)")
+    interview_type: str = Field("general", description="Interview type: phone, video, in-person, technical, or general")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "interview_date": "2025-12-15",
+                "interview_type": "video",
+                "metadata": {}
+            }
+        }
+
+
+class InterviewPrepResponse(BaseModel):
+    """Response model for interview prep operations"""
+    success: bool
+    preparation_plan: Optional[str] = None
+    questions: Optional[str] = None
+    star_framework: Optional[str] = None
+    mock_interview: Optional[str] = None
+    tips: Optional[str] = None
+    checklist: Optional[str] = None
+    output: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+# Interview Prep Agent Endpoints
+
+@router.post("/interview-prep/prepare", response_model=InterviewPrepResponse)
+async def prepare_for_interview(
+    request: InterviewPrepRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Comprehensive interview preparation for a job application.
+
+    This endpoint provides:
+    - Company research and insights
+    - Job description analysis
+    - Relevant interview questions
+    - Preparation timeline and checklist
+    """
+    try:
+        logger.info(f"🎯 Interview Prep: Preparing for {request.job_title} at {request.company_name}")
+
+        agent = create_interview_prep_agent(db)
+
+        result = await agent.prepare_for_interview(
+            job_id=request.job_id,
+            company_name=request.company_name,
+            job_title=request.job_title,
+            job_description=request.job_description,
+            interview_date=request.interview_date or "",
+            interview_type=request.interview_type
+        )
+
+        logger.info(f"✅ Interview preparation {'successful' if result['success'] else 'failed'}")
+
+        return InterviewPrepResponse(
+            success=result["success"],
+            preparation_plan=result.get("preparation_plan"),
+            output=result.get("preparation_plan"),
+            metadata=result.get("metadata"),
+            error=result.get("error")
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in interview preparation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/interview-prep/generate-questions", response_model=InterviewPrepResponse)
+async def generate_interview_questions(
+    request: QuestionGenerationRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Generate relevant interview questions for a specific role.
+
+    Provides:
+    - Behavioral questions (STAR format)
+    - Technical questions (role-specific)
+    - Situational questions
+    - Company-fit questions
+    """
+    try:
+        logger.info(f"❓ Interview Prep: Generating {request.question_type} questions for {request.job_title}")
+
+        agent = create_interview_prep_agent(db)
+
+        result = await agent.generate_practice_questions(
+            job_title=request.job_title,
+            company_name=request.company_name,
+            job_description=request.job_description,
+            question_type=request.question_type,
+            difficulty="medium"
+        )
+
+        logger.info(f"✅ Question generation {'successful' if result['success'] else 'failed'}")
+
+        return InterviewPrepResponse(
+            success=result["success"],
+            questions=result.get("questions"),
+            output=result.get("questions"),
+            metadata=result.get("metadata"),
+            error=result.get("error")
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error generating questions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/interview-prep/star-answer", response_model=InterviewPrepResponse)
+async def prepare_star_answer(
+    request: STARAnswerRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Help prepare a STAR format answer for a specific interview question.
+
+    STAR = Situation, Task, Action, Result
+
+    Provides:
+    - STAR format framework
+    - Tips for answering effectively
+    - Example structure
+    """
+    try:
+        logger.info(f"⭐ Interview Prep: Preparing STAR answer for question")
+
+        agent = create_interview_prep_agent(db)
+
+        result = await agent.practice_star_answer(
+            question=request.question,
+            experience_context=request.experience_context
+        )
+
+        logger.info(f"✅ STAR answer preparation {'successful' if result['success'] else 'failed'}")
+
+        return InterviewPrepResponse(
+            success=result["success"],
+            star_framework=result.get("star_framework"),
+            output=result.get("star_framework"),
+            metadata=result.get("metadata"),
+            error=result.get("error")
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error preparing STAR answer: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/interview-prep/mock-interview", response_model=InterviewPrepResponse)
+async def start_mock_interview(
+    request: MockInterviewRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Start a mock interview practice session.
+
+    Provides:
+    - Practice questions based on role and difficulty
+    - Self-evaluation framework
+    - Performance tracking
+    """
+    try:
+        logger.info(f"🎭 Interview Prep: Starting mock interview for {request.job_title}")
+
+        agent = create_interview_prep_agent(db)
+
+        result = await agent.start_mock_interview(
+            job_title=request.job_title,
+            focus_area=request.focus_area,
+            difficulty=request.difficulty
+        )
+
+        logger.info(f"✅ Mock interview {'started' if result['success'] else 'failed'}")
+
+        return InterviewPrepResponse(
+            success=result["success"],
+            mock_interview=result.get("mock_interview"),
+            output=result.get("mock_interview"),
+            metadata=result.get("metadata"),
+            error=result.get("error")
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error starting mock interview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/interview-prep/tips", response_model=InterviewPrepResponse)
+async def get_interview_tips(
+    request: InterviewTipsRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Get interview tips and strategies based on interview stage and role level.
+
+    Provides:
+    - Stage-specific tips
+    - Role-level guidance
+    - Best practices
+    - Common mistakes to avoid
+    """
+    try:
+        logger.info(f"💡 Interview Prep: Getting tips for {request.interview_stage} interview ({request.role_level} level)")
+
+        agent = create_interview_prep_agent(db)
+
+        # Use the agent to get tips
+        query = f"Provide interview tips for a {request.interview_stage} interview at {request.role_level} level"
+        response = await agent.run(query, context={
+            "interview_stage": request.interview_stage,
+            "role_level": request.role_level
+        })
+
+        logger.info(f"✅ Tips retrieval {'successful' if response.success else 'failed'}")
+
+        return InterviewPrepResponse(
+            success=response.success,
+            tips=response.output,
+            output=response.output,
+            metadata=response.metadata,
+            error=response.error
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error getting interview tips: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/interview-prep/checklist", response_model=InterviewPrepResponse)
+async def get_interview_checklist(
+    request: InterviewChecklistRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Get a comprehensive interview preparation checklist with timeline.
+
+    Provides:
+    - Preparation timeline
+    - Type-specific checklist items
+    - Day-of-interview checklist
+    - Post-interview steps
+    """
+    try:
+        logger.info(f"📋 Interview Prep: Getting checklist for {request.interview_type} interview")
+
+        agent = create_interview_prep_agent(db)
+
+        # Use the agent to get checklist
+        query = f"Generate interview preparation checklist for {request.interview_type} interview"
+        if request.interview_date:
+            query += f" on {request.interview_date}"
+
+        response = await agent.run(query, context={
+            "interview_date": request.interview_date,
+            "interview_type": request.interview_type
+        })
+
+        logger.info(f"✅ Checklist generation {'successful' if response.success else 'failed'}")
+
+        return InterviewPrepResponse(
+            success=response.success,
+            checklist=response.output,
+            output=response.output,
+            metadata=response.metadata,
+            error=response.error
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error generating checklist: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/interview-prep/stats", response_model=AgentStatsResponse)
+async def get_interview_prep_stats(db: DatabaseManager = Depends(get_db)):
+    """
+    Get Interview Prep Agent statistics and performance metrics.
+    """
+    try:
+        logger.info("📊 Interview Prep: Fetching agent statistics")
+
+        agent = create_interview_prep_agent(db)
+        stats = agent.get_stats()
+
+        return AgentStatsResponse(
+            name=stats["name"],
+            execution_count=stats["execution_count"],
+            tools_count=stats["tools_count"],
+            memory_size=stats["memory_size"]
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error fetching interview prep stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.websocket("/interview-prep/ws")
+async def interview_prep_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time interview preparation.
+
+    Supported message types:
+    - prepare: Comprehensive interview preparation
+    - generate_questions: Generate interview questions
+    - star_answer: Prepare STAR format answer
+    - mock_interview: Start mock interview
+    - tips: Get interview tips
+    - checklist: Get preparation checklist
+    - ping: Connection health check
+    """
+    await websocket.accept()
+    logger.info("🔌 Interview Prep WebSocket connection established")
+
+    db = DatabaseManager()
+    agent = create_interview_prep_agent(db)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            message_type = data.get("type")
+            request_data = data.get("data", {})
+
+            logger.info(f"📨 Received WebSocket message: {message_type}")
+
+            if message_type == "prepare":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"message": "Preparing for interview..."}
+                })
+
+                try:
+                    result = await agent.prepare_for_interview(
+                        job_id=request_data.get("job_id"),
+                        company_name=request_data.get("company_name", ""),
+                        job_title=request_data.get("job_title", ""),
+                        job_description=request_data.get("job_description", ""),
+                        interview_date=request_data.get("interview_date", ""),
+                        interview_type=request_data.get("interview_type", "general")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket interview preparation: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "generate_questions":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"message": "Generating interview questions..."}
+                })
+
+                try:
+                    result = await agent.generate_practice_questions(
+                        job_title=request_data.get("job_title", ""),
+                        company_name=request_data.get("company_name", ""),
+                        job_description=request_data.get("job_description", ""),
+                        question_type=request_data.get("question_type", "mixed"),
+                        difficulty=request_data.get("difficulty", "medium")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket question generation: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "star_answer":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"message": "Preparing STAR answer..."}
+                })
+
+                try:
+                    result = await agent.practice_star_answer(
+                        question=request_data.get("question", ""),
+                        experience_context=request_data.get("experience_context", "")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket STAR answer: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "mock_interview":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"message": "Starting mock interview..."}
+                })
+
+                try:
+                    result = await agent.start_mock_interview(
+                        job_title=request_data.get("job_title", ""),
+                        focus_area=request_data.get("focus_area", "general"),
+                        difficulty=request_data.get("difficulty", "medium")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket mock interview: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "ping":
+                await websocket.send_json({
+                    "type": "pong",
+                    "data": {"timestamp": datetime.now().isoformat()}
+                })
+
+            else:
+                await websocket.send_json({
+                    "type": "error",
+                    "data": {"error": f"Unknown message type: {message_type}"}
+                })
+
+    except WebSocketDisconnect:
+        logger.info("🔌 Interview Prep WebSocket connection closed")
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
