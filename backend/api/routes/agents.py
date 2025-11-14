@@ -15,6 +15,7 @@ from agents_framework.agents.email_analyst_agent import create_email_analyst_age
 from agents_framework.agents.followup_agent import create_followup_agent
 from agents_framework.agents.job_hunter_agent import create_job_hunter_agent
 from agents_framework.agents.resume_writer_agent import create_resume_writer_agent
+from agents_framework.agents.analytics_agent import create_analytics_agent
 from agents_framework.agents.interview_prep_agent import create_interview_prep_agent
 from agents_framework.agents.orchestrator_agent import create_orchestrator_agent
 
@@ -1374,9 +1375,551 @@ async def resume_writer_websocket(websocket: WebSocket):
             pass
 
 
-# ============================================================================
-# INTERVIEW PREP AGENT ENDPOINTS
-# ============================================================================
+# Analytics Agent Request/Response Models
+class AnalyticsDataRequest(BaseModel):
+    """Request model for analytics data analysis"""
+    user_id: int = Field(1, description="User ID to analyze")
+    time_period_days: int = Field(90, description="Number of days to analyze")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": 1,
+                "time_period_days": 90
+            }
+        }
+
+
+class SuccessPatternsRequest(BaseModel):
+    """Request model for success pattern analysis"""
+    user_id: int = Field(1, description="User ID to analyze")
+    min_confidence: float = Field(0.7, description="Minimum confidence threshold (0.0-1.0)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": 1,
+                "min_confidence": 0.7
+            }
+        }
+
+
+class OfferPredictionRequest(BaseModel):
+    """Request model for offer likelihood prediction"""
+    job_details: Dict[str, Any] = Field(..., description="Job information")
+    user_profile: Dict[str, Any] = Field(..., description="User profile information")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_details": {
+                    "title": "Software Engineer",
+                    "company_size": "Medium",
+                    "industry": "Technology"
+                },
+                "user_profile": {
+                    "skills_match_percent": 75,
+                    "has_referral": False,
+                    "has_cover_letter": True,
+                    "years_experience": 5,
+                    "application_quality_score": 8.0
+                }
+            }
+        }
+
+
+class StrategyRequest(BaseModel):
+    """Request model for optimization strategy"""
+    current_stats: Dict[str, Any] = Field(..., description="Current performance statistics")
+    target_role: str = Field(..., description="Target job role")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "current_stats": {
+                    "success_rate": 0.067,
+                    "applications_per_week": 10
+                },
+                "target_role": "Software Engineer"
+            }
+        }
+
+
+class SalaryAnalysisRequest(BaseModel):
+    """Request model for salary analysis"""
+    job_title: str = Field(..., description="Job title/role")
+    location: str = Field(..., description="Geographic location")
+    years_experience: int = Field(..., description="Years of experience")
+    industry: str = Field("Technology", description="Industry sector")
+    company_size: str = Field("Medium", description="Company size category")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_title": "Software Engineer",
+                "location": "San Francisco, CA",
+                "years_experience": 5,
+                "industry": "Technology",
+                "company_size": "Medium"
+            }
+        }
+
+
+class AnalyticsResponse(BaseModel):
+    """Response model for analytics operations"""
+    success: bool
+    analysis: Optional[str] = None
+    patterns: Optional[str] = None
+    prediction: Optional[str] = None
+    strategy: Optional[str] = None
+    salary_analysis: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+# Analytics Agent Endpoints
+@router.post("/analytics/analyze-data", response_model=AnalyticsResponse)
+async def analyze_application_data(
+    request: AnalyticsDataRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Analyze job application data and provide comprehensive insights.
+
+    This endpoint uses AI to:
+    - Calculate overall statistics and trends
+    - Analyze conversion rates at each application stage
+    - Compute response time metrics
+    - Break down applications by industry and company size
+    - Generate actionable insights and recommendations
+
+    Returns detailed data analysis with key metrics and trends.
+    """
+    try:
+        logger.info(f"📊 Analytics: Analyzing data for user {request.user_id} over {request.time_period_days} days")
+
+        # Create agent
+        agent = create_analytics_agent(db)
+
+        # Analyze application data
+        result = await agent.analyze_application_data(
+            user_id=request.user_id,
+            time_period_days=request.time_period_days
+        )
+
+        logger.info(f"✅ Data analysis {'successful' if result['success'] else 'failed'}")
+
+        return AnalyticsResponse(
+            success=result['success'],
+            analysis=result.get('analysis'),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in data analysis: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing application data: {str(e)}"
+        )
+
+
+@router.post("/analytics/success-patterns", response_model=AnalyticsResponse)
+async def identify_success_patterns(
+    request: SuccessPatternsRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Identify patterns that correlate with successful job application outcomes.
+
+    This endpoint uses AI to:
+    - Analyze application timing patterns
+    - Evaluate application quality factors
+    - Identify successful company characteristics
+    - Study effective follow-up strategies
+    - Assess skills alignment impact
+
+    Returns identified patterns with confidence scores and recommendations.
+    """
+    try:
+        logger.info(f"🔍 Analytics: Identifying success patterns for user {request.user_id}")
+
+        # Create agent
+        agent = create_analytics_agent(db)
+
+        # Get success patterns
+        result = await agent.get_success_patterns(
+            user_id=request.user_id,
+            min_confidence=request.min_confidence
+        )
+
+        logger.info(f"✅ Pattern analysis {'successful' if result['success'] else 'failed'}")
+
+        return AnalyticsResponse(
+            success=result['success'],
+            patterns=result.get('patterns'),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in pattern analysis: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error identifying success patterns: {str(e)}"
+        )
+
+
+@router.post("/analytics/predict-offer", response_model=AnalyticsResponse)
+async def predict_offer_likelihood(
+    request: OfferPredictionRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Predict the likelihood of receiving a job offer.
+
+    This endpoint uses AI to:
+    - Calculate offer probability based on multiple factors
+    - Analyze contributing strengths and weaknesses
+    - Identify areas for improvement
+    - Provide specific recommendations to increase success chances
+    - Estimate probabilities for each stage (screening, interview, offer)
+
+    Returns prediction with confidence level and actionable recommendations.
+    """
+    try:
+        job_title = request.job_details.get("title", "Unknown")
+        logger.info(f"🎯 Analytics: Predicting offer likelihood for {job_title}")
+
+        # Create agent
+        agent = create_analytics_agent(db)
+
+        # Predict offer likelihood
+        result = await agent.predict_offer_success(
+            job_details=request.job_details,
+            user_profile=request.user_profile
+        )
+
+        logger.info(f"✅ Offer prediction {'successful' if result['success'] else 'failed'}")
+
+        return AnalyticsResponse(
+            success=result['success'],
+            prediction=result.get('prediction'),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in offer prediction: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error predicting offer likelihood: {str(e)}"
+        )
+
+
+@router.post("/analytics/strategy", response_model=AnalyticsResponse)
+async def get_optimization_strategy(
+    request: StrategyRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Generate personalized job search optimization strategy.
+
+    This endpoint uses AI to:
+    - Analyze current performance metrics
+    - Identify strategic priorities based on data
+    - Provide tactical actions with timelines
+    - Recommend resource allocation
+    - Set realistic expected outcomes
+
+    Returns comprehensive strategy with prioritized recommendations.
+    """
+    try:
+        logger.info(f"🎯 Analytics: Generating optimization strategy for {request.target_role}")
+
+        # Create agent
+        agent = create_analytics_agent(db)
+
+        # Get optimization strategy
+        result = await agent.get_optimization_strategy(
+            current_stats=request.current_stats,
+            target_role=request.target_role
+        )
+
+        logger.info(f"✅ Strategy generation {'successful' if result['success'] else 'failed'}")
+
+        return AnalyticsResponse(
+            success=result['success'],
+            strategy=result.get('strategy'),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in strategy generation: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating optimization strategy: {str(e)}"
+        )
+
+
+@router.post("/analytics/salary", response_model=AnalyticsResponse)
+async def analyze_market_salary(
+    request: SalaryAnalysisRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Analyze market salary data for a given role and location.
+
+    This endpoint uses AI to:
+    - Provide salary ranges by percentile (p10, p25, median, p75, p90)
+    - Break down total compensation (base, bonus, equity)
+    - Share market insights and trends
+    - Offer negotiation strategies
+    - List benefits to consider
+
+    Returns comprehensive salary analysis with negotiation guidance.
+    """
+    try:
+        logger.info(f"💰 Analytics: Analyzing salary for {request.job_title} in {request.location}")
+
+        # Create agent
+        agent = create_analytics_agent(db)
+
+        # Get salary insights
+        result = await agent.get_salary_insights(
+            job_title=request.job_title,
+            location=request.location,
+            years_experience=request.years_experience,
+            industry=request.industry,
+            company_size=request.company_size
+        )
+
+        logger.info(f"✅ Salary analysis {'successful' if result['success'] else 'failed'}")
+
+        return AnalyticsResponse(
+            success=result['success'],
+            salary_analysis=result.get('salary_analysis'),
+            metadata=result.get('metadata'),
+            error=result.get('error')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in salary analysis: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing market salary: {str(e)}"
+        )
+
+
+@router.get("/analytics/stats", response_model=AgentStatsResponse)
+async def get_analytics_agent_stats(db: DatabaseManager = Depends(get_db)):
+    """
+    Get statistics and status information for the Analytics Agent.
+
+    Returns:
+    - Agent name and configuration
+    - Number of executions
+    - Available tools count
+    - Memory usage
+    - Performance metrics
+    """
+    try:
+        logger.info("📊 Analytics: Getting agent statistics")
+
+        # Create agent
+        agent = create_analytics_agent(db)
+
+        # Get statistics
+        stats = agent.get_stats()
+
+        return AgentStatsResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"❌ Error getting agent stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving agent statistics: {str(e)}"
+        )
+
+
+# WebSocket endpoint for real-time analytics operations
+@router.websocket("/analytics/ws")
+async def analytics_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time analytics operations.
+
+    Allows streaming analytics results as the agent processes them.
+
+    Message format:
+    - Client sends: {"type": "analyze_data", "data": {...}}
+    - Client sends: {"type": "success_patterns", "data": {...}}
+    - Client sends: {"type": "predict_offer", "data": {...}}
+    - Client sends: {"type": "strategy", "data": {...}}
+    - Client sends: {"type": "salary", "data": {...}}
+    - Server sends: {"type": "operation_complete", "data": {...}}
+    """
+    await websocket.accept()
+    logger.info("🔌 Analytics WebSocket connection established")
+
+    try:
+        db = DatabaseManager()
+        agent = create_analytics_agent(db)
+
+        while True:
+            # Receive message from client
+            data = await websocket.receive_json()
+
+            message_type = data.get("type")
+            request_data = data.get("data", {})
+
+            if message_type == "analyze_data":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "data_analysis", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.analyze_application_data(
+                        user_id=request_data.get("user_id", 1),
+                        time_period_days=request_data.get("time_period_days", 90)
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket data analysis: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "success_patterns":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "pattern_analysis", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.get_success_patterns(
+                        user_id=request_data.get("user_id", 1),
+                        min_confidence=request_data.get("min_confidence", 0.7)
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket pattern analysis: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "predict_offer":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "offer_prediction", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.predict_offer_success(
+                        job_details=request_data.get("job_details", {}),
+                        user_profile=request_data.get("user_profile", {})
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket offer prediction: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "strategy":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "strategy_generation", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.get_optimization_strategy(
+                        current_stats=request_data.get("current_stats", {}),
+                        target_role=request_data.get("target_role", "Software Engineer")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket strategy generation: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "salary":
+                await websocket.send_json({
+                    "type": "operation_started",
+                    "data": {"operation": "salary_analysis", "timestamp": datetime.now().isoformat()}
+                })
+
+                try:
+                    result = await agent.get_salary_insights(
+                        job_title=request_data.get("job_title", "Software Engineer"),
+                        location=request_data.get("location", "San Francisco, CA"),
+                        years_experience=request_data.get("years_experience", 5),
+                        industry=request_data.get("industry", "Technology"),
+                        company_size=request_data.get("company_size", "Medium")
+                    )
+
+                    await websocket.send_json({
+                        "type": "operation_complete",
+                        "data": result
+                    })
+
+                except Exception as e:
+                    logger.error(f"❌ Error in WebSocket salary analysis: {e}")
+                    await websocket.send_json({
+                        "type": "operation_error",
+                        "data": {"error": str(e)}
+                    })
+
+            elif message_type == "ping":
+                await websocket.send_json({
+                    "type": "pong",
+                    "data": {"timestamp": datetime.now().isoformat()}
+                })
+
+            else:
+                await websocket.send_json({
+                    "type": "error",
+                    "data": {"error": f"Unknown message type: {message_type}"}
+                })
+
+    except WebSocketDisconnect:
+        logger.info("🔌 Analytics WebSocket connection closed")
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+# Future agent endpoints can be added here
+# Example structure for other agents:
 
 # Interview Prep Agent Request/Response Models
 
