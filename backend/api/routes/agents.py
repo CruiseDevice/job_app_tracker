@@ -12,6 +12,7 @@ import logging
 
 from database.database_manager import DatabaseManager
 from agents_framework.agents.email_analyst_agent import create_email_analyst_agent
+from agents_framework.agents.application_manager_agent import create_application_manager_agent
 
 logger = logging.getLogger(__name__)
 
@@ -337,14 +338,307 @@ async def email_analyst_websocket(websocket: WebSocket):
             pass
 
 
-# Future agent endpoints can be added here
-# Example structure for other agents:
+# ============================================================================
+# Application Manager Agent Endpoints
+# ============================================================================
 
-# @router.post("/application-manager/analyze")
-# async def analyze_application(...)
-#
-# @router.post("/followup-agent/generate")
-# async def generate_followup(...)
-#
-# @router.post("/job-hunter/search")
-# async def search_jobs(...)
+class ApplicationManagementRequest(BaseModel):
+    """Request model for application management"""
+    application_id: int = Field(..., description="Application ID to manage")
+    context: Optional[str] = Field(None, description="Additional context (e.g., recent email)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "application_id": 1,
+                "context": "Just received interview invitation email"
+            }
+        }
+
+
+class PortfolioAnalysisRequest(BaseModel):
+    """Request model for portfolio analysis"""
+    focus_area: Optional[str] = Field("all", description="Focus area: all, timeline, success_rate")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "focus_area": "all"
+            }
+        }
+
+
+@router.post("/application-manager/manage")
+async def manage_application(
+    request: ApplicationManagementRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Comprehensively manage a job application with AI insights.
+
+    This endpoint uses AI to:
+    - Predict application lifecycle and next stages
+    - Calculate application health score (0-100)
+    - Recommend specific next actions with priorities
+    - Provide strategic guidance
+
+    Returns comprehensive management insights and recommendations.
+    """
+    try:
+        logger.info(f"📊 Application Manager: Managing application {request.application_id}")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Manage application
+        result = await agent.manage_application(
+            application_id=request.application_id,
+            context=request.context
+        )
+
+        logger.info(f"✅ Application management {'successful' if result['success'] else 'failed'}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"❌ Error managing application: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error managing application: {str(e)}"
+        )
+
+
+@router.post("/application-manager/portfolio")
+async def analyze_portfolio(
+    request: PortfolioAnalysisRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Analyze entire application portfolio for strategic insights.
+
+    This endpoint uses AI to:
+    - Identify success patterns across all applications
+    - Calculate overall success rate and metrics
+    - Provide strategic recommendations
+    - Highlight strongest and weakest applications
+    - Suggest portfolio optimization strategies
+
+    Useful for understanding overall job search performance.
+    """
+    try:
+        logger.info("📊 Application Manager: Analyzing portfolio")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Analyze portfolio
+        result = await agent.analyze_portfolio()
+
+        logger.info(f"✅ Portfolio analysis {'successful' if result['success'] else 'failed'}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"❌ Error analyzing portfolio: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing portfolio: {str(e)}"
+        )
+
+
+@router.get("/application-manager/lifecycle/{application_id}")
+async def get_lifecycle_prediction(
+    application_id: int,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Get lifecycle prediction for a specific application.
+
+    Returns:
+    - Current stage
+    - Predicted next stages with probabilities
+    - Typical timelines
+    - Application health status
+    """
+    try:
+        logger.info(f"📊 Application Manager: Predicting lifecycle for {application_id}")
+
+        # Create agent (we'll just use the tool directly for this simple case)
+        agent = create_application_manager_agent(db)
+
+        # Get the predict_lifecycle tool
+        predict_tool = next(t for t in agent.tools if t.name == "predict_lifecycle")
+
+        # Run the tool
+        result = predict_tool.func(str(application_id))
+
+        return {
+            "success": True,
+            "application_id": application_id,
+            "prediction": result
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error predicting lifecycle: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error predicting lifecycle: {str(e)}"
+        )
+
+
+@router.get("/application-manager/health/{application_id}")
+async def get_health_score(
+    application_id: int,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Get health score for a specific application.
+
+    Returns:
+    - Health score (0-100)
+    - Health rating (EXCELLENT, GOOD, FAIR, POOR)
+    - Score breakdown
+    - Recommendations
+    """
+    try:
+        logger.info(f"📊 Application Manager: Calculating health for {application_id}")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Get the calculate_health_score tool
+        health_tool = next(t for t in agent.tools if t.name == "calculate_health_score")
+
+        # Run the tool
+        result = health_tool.func(str(application_id))
+
+        return {
+            "success": True,
+            "application_id": application_id,
+            "health_analysis": result
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error calculating health: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error calculating health: {str(e)}"
+        )
+
+
+@router.get("/application-manager/actions/{application_id}")
+async def get_next_actions(
+    application_id: int,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Get recommended next actions for a specific application.
+
+    Returns:
+    - Immediate actions (next 7 days) with priorities
+    - Long-term actions
+    - Timelines for each action
+    - Priority levels (critical, high, medium, low)
+    """
+    try:
+        logger.info(f"📊 Application Manager: Getting actions for {application_id}")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Get the recommend_next_actions tool
+        actions_tool = next(t for t in agent.tools if t.name == "recommend_next_actions")
+
+        # Run the tool
+        result = actions_tool.func(str(application_id))
+
+        return {
+            "success": True,
+            "application_id": application_id,
+            "actions": result
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error getting actions: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting actions: {str(e)}"
+        )
+
+
+@router.get("/application-manager/patterns")
+async def get_success_patterns(db: DatabaseManager = Depends(get_db)):
+    """
+    Identify success patterns across all applications.
+
+    Returns:
+    - Success rate statistics
+    - Status distribution
+    - Average response times
+    - Key insights and recommendations
+    """
+    try:
+        logger.info("📊 Application Manager: Identifying patterns")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Get the identify_patterns tool
+        patterns_tool = next(t for t in agent.tools if t.name == "identify_patterns")
+
+        # Run the tool
+        result = patterns_tool.func()
+
+        return {
+            "success": True,
+            "patterns": result
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error identifying patterns: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error identifying patterns: {str(e)}"
+        )
+
+
+@router.get("/application-manager/insights")
+async def get_insights(
+    focus: str = "all",
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Generate actionable insights about job search.
+
+    Parameters:
+    - focus: Focus area (general, timeline, success_rate, recommendations, all)
+
+    Returns comprehensive insights based on focus area.
+    """
+    try:
+        logger.info(f"📊 Application Manager: Generating insights (focus: {focus})")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Get the generate_insights tool
+        insights_tool = next(t for t in agent.tools if t.name == "generate_insights")
+
+        # Run the tool
+        result = insights_tool.func(focus)
+
+        return {
+            "success": True,
+            "focus": focus,
+            "insights": result
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error generating insights: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating insights: {str(e)}"
+        )
+
+
+# Future agent endpoints will be added below
