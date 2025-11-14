@@ -1,14 +1,16 @@
 import { api } from './api';
-import type { JobApplication, ApplicationFilters, ApplicationStats, CreateApplicationRequest } from '../types/application';
+import type { JobApplication, ApplicationFilters, ApplicationStats, CreateApplicationRequest, PaginatedApplicationsResponse } from '../types/application';
 
 export const applicationsApi = {
-  // Get all applications with optional filtering
-  getApplications: async (filters?: ApplicationFilters): Promise<JobApplication[]> => {
+  // Get all applications with optional filtering and pagination
+  getApplications: async (filters?: ApplicationFilters): Promise<PaginatedApplicationsResponse> => {
     const params = new URLSearchParams();
     
     if (filters?.status) params.append('status', filters.status);
     if (filters?.company) params.append('company', filters.company);
     if (filters?.search) params.append('search', filters.search);
+    if (filters?.skip !== undefined) params.append('skip', filters.skip.toString());
+    if (filters?.limit !== undefined) params.append('limit', filters.limit.toString());
     
     const response = await api.get(`/applications?${params.toString()}`);
     return response.data;

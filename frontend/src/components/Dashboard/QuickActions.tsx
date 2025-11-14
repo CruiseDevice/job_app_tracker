@@ -37,7 +37,7 @@ const QuickActions: React.FC = () => {
     setIsRefreshing(true);
     try {
       await Promise.all([
-        dispatch(fetchApplications()).unwrap(),
+        dispatch(fetchApplications({ skip: 0, limit: 10 })).unwrap(),
         dispatch(fetchStatistics()).unwrap()
       ]);
     } catch (error) {

@@ -33,6 +33,15 @@ export interface JobApplication {
       end: string;
     };
     search?: string;
+    skip?: number;
+    limit?: number;
+  }
+
+export interface PaginatedApplicationsResponse {
+    applications: JobApplication[];
+    total: number;
+    skip: number;
+    limit: number;
   }
   
   export interface ApplicationStats {

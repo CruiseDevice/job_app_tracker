@@ -17,7 +17,8 @@ const Dashboard: React.FC = () => {
   const { is_monitoring } = useAppSelector(state => state.monitor);
 
   useEffect(() => {
-    dispatch(fetchApplications());
+    // Fetch recent applications for dashboard (first 10 items)
+    dispatch(fetchApplications({ skip: 0, limit: 10 }));
     dispatch(fetchStatistics());
   }, [dispatch]);
 
@@ -93,7 +94,7 @@ const Dashboard: React.FC = () => {
         {/* Recent Applications */}
         <div className="lg:col-span-2">
           <RecentApplications 
-            applications={applications.slice(0, 10)} 
+            applications={applications} 
             loading={applicationsLoading} 
           />
         </div>
