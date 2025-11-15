@@ -95,8 +95,16 @@ const applicationsSlice = createSlice({
       state.error = null;
     },
     addApplicationFromWebSocket: (state, action: PayloadAction<JobApplication>) => {
-      state.applications.unshift(action.payload);
-      state.pagination.total += 1;
+      // Check for duplicates before adding
+      const existingIndex = state.applications.findIndex(app => app.id === action.payload.id);
+      if (existingIndex === -1) {
+        // Only add if it doesn't already exist
+        state.applications.unshift(action.payload);
+        state.pagination.total += 1;
+      } else {
+        // Update existing application instead of adding duplicate
+        state.applications[existingIndex] = action.payload;
+      }
     },
     updateApplicationFromWebSocket: (state, action: PayloadAction<JobApplication>) => {
       const index = state.applications.findIndex(app => app.id === action.payload.id);
