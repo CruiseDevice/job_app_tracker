@@ -269,12 +269,6 @@ Run unit tests (requires pytest):
 pytest backend/tests/test_job_hunter_agent.py -v
 ```
 
-### Manual Tests
-Run manual test suite:
-```bash
-python backend/tests/manual_test_job_hunter.py
-```
-
 ### Test Coverage
 - Tool registration and functionality
 - Job search across platforms
