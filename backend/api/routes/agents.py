@@ -13,6 +13,7 @@ import logging
 from database.database_manager import DatabaseManager
 from agents_framework.agents.email_analyst_agent import create_email_analyst_agent
 from agents_framework.agents.followup_agent import create_followup_agent
+from agents_framework.agents.application_manager_agent import create_application_manager_agent
 from agents_framework.agents.job_hunter_agent import create_job_hunter_agent
 from agents_framework.agents.resume_writer_agent import create_resume_writer_agent
 from agents_framework.agents.analytics_agent import create_analytics_agent
@@ -168,6 +169,106 @@ class FollowUpResponse(BaseModel):
     """Response model for follow-up operations"""
     success: bool
     output: str
+    metadata: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+# Application Manager Agent Request/Response Models
+class LifecyclePredictionRequest(BaseModel):
+    """Request model for lifecycle prediction"""
+    job_id: int = Field(..., description="Job application ID")
+    current_status: str = Field(..., description="Current application status")
+    days_elapsed: int = Field(..., description="Days since application or last activity")
+    last_activity: str = Field(..., description="Type of last activity")
+    company_type: str = Field("medium", description="Company type/size")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "job_id": 123,
+                "current_status": "phone_screen",
+                "days_elapsed": 5,
+                "last_activity": "interview completed",
+                "company_type": "startup",
+                "metadata": {}
+            }
+        }
+
+
+class NextActionsRequest(BaseModel):
+    """Request model for next actions recommendation"""
+    status: str = Field(..., description="Current application status")
+    days_since_activity: int = Field(..., description="Days since last activity")
+    last_interaction_type: str = Field(..., description="Type of last interaction")
+    sentiment: str = Field("neutral", description="Overall sentiment of interactions")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "technical",
+                "days_since_activity": 3,
+                "last_interaction_type": "interview",
+                "sentiment": "positive",
+                "metadata": {}
+            }
+        }
+
+
+class ApplicationPatternsRequest(BaseModel):
+    """Request model for application patterns analysis"""
+    applications: List[Dict[str, Any]] = Field(..., description="List of applications to analyze")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "applications": [
+                    {
+                        "status": "applied",
+                        "company_type": "startup",
+                        "response_days": 7
+                    },
+                    {
+                        "status": "interview",
+                        "company_type": "enterprise",
+                        "response_days": 3
+                    }
+                ],
+                "metadata": {}
+            }
+        }
+
+
+class SuccessProbabilityRequest(BaseModel):
+    """Request model for success probability estimation"""
+    status: str = Field(..., description="Current application status")
+    response_time: int = Field(..., description="Response time in days")
+    sentiment: str = Field(..., description="Overall sentiment")
+    recruiter_engagement: str = Field(..., description="Level of recruiter engagement")
+    company_size: str = Field(..., description="Company size category")
+    role_match: int = Field(..., description="Role match percentage (0-100)")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "onsite",
+                "response_time": 3,
+                "sentiment": "positive",
+                "recruiter_engagement": "high",
+                "company_size": "large",
+                "role_match": 85,
+                "metadata": {}
+            }
+        }
+
+
+class ApplicationManagerResponse(BaseModel):
+    """Response model for application manager operations"""
+    success: bool
+    analysis: str
     metadata: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
@@ -841,6 +942,227 @@ async def followup_agent_websocket(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+# Application Manager Agent Endpoints
+@router.post("/application-manager/predict-lifecycle", response_model=ApplicationManagerResponse)
+async def predict_application_lifecycle(
+    request: LifecyclePredictionRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Predict the next lifecycle stage based on current application data.
+
+    This endpoint uses AI to:
+    - Analyze current application stage
+    - Predict next possible stages
+    - Provide typical timeline
+    - Identify success indicators and warning signs
+    - Make recommendations based on elapsed time
+
+    Returns lifecycle predictions with detailed analysis.
+    """
+    try:
+        logger.info(f"📊 Application Manager: Predicting lifecycle for job #{request.job_id}")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Prepare application data
+        app_data = f"{request.job_id}|{request.current_status}|{request.days_elapsed}|{request.last_activity}|{request.company_type}"
+
+        # Predict lifecycle
+        prompt = f"Use predict_lifecycle_stage tool with this data: {app_data}"
+        result = await agent.execute(prompt)
+
+        logger.info(f"✅ Lifecycle prediction completed")
+
+        return ApplicationManagerResponse(
+            success=True,
+            analysis=result.get('output', ''),
+            metadata={"job_id": request.job_id, "current_status": request.current_status}
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error in lifecycle prediction: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error predicting lifecycle: {str(e)}"
+        )
+
+
+@router.post("/application-manager/next-actions", response_model=ApplicationManagerResponse)
+async def recommend_next_actions(
+    request: NextActionsRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Recommend specific next actions based on application state.
+
+    This endpoint uses AI to:
+    - Analyze current application status
+    - Consider timing and sentiment
+    - Generate priority-ranked action items
+    - Provide templates and reasoning for each action
+
+    Returns actionable recommendations with priorities.
+    """
+    try:
+        logger.info(f"📋 Application Manager: Recommending next actions for {request.status}")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Prepare context data
+        context = f"{request.status}|{request.days_since_activity}|{request.last_interaction_type}|{request.sentiment}"
+
+        # Get recommendations
+        prompt = f"Use recommend_next_actions tool with this context: {context}"
+        result = await agent.execute(prompt)
+
+        logger.info(f"✅ Next actions generated")
+
+        return ApplicationManagerResponse(
+            success=True,
+            analysis=result.get('output', ''),
+            metadata={"status": request.status, "sentiment": request.sentiment}
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error recommending next actions: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error recommending actions: {str(e)}"
+        )
+
+
+@router.post("/application-manager/analyze-patterns", response_model=ApplicationManagerResponse)
+async def analyze_application_patterns(
+    request: ApplicationPatternsRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Analyze patterns across multiple applications to identify insights.
+
+    This endpoint uses AI to:
+    - Analyze status distribution
+    - Calculate success metrics
+    - Identify company type patterns
+    - Provide insights and recommendations
+    - Calculate interview and offer rates
+
+    Returns comprehensive pattern analysis.
+    """
+    try:
+        logger.info(f"🔍 Application Manager: Analyzing patterns for {len(request.applications)} applications")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Prepare applications data
+        import json
+        apps_json = json.dumps(request.applications)
+
+        # Analyze patterns
+        prompt = f"Use analyze_application_patterns tool with this data: {apps_json}"
+        result = await agent.execute(prompt)
+
+        logger.info(f"✅ Pattern analysis completed")
+
+        return ApplicationManagerResponse(
+            success=True,
+            analysis=result.get('output', ''),
+            metadata={"application_count": len(request.applications)}
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error analyzing patterns: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing patterns: {str(e)}"
+        )
+
+
+@router.post("/application-manager/success-probability", response_model=ApplicationManagerResponse)
+async def estimate_success_probability(
+    request: SuccessProbabilityRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Estimate the probability of success based on various signals.
+
+    This endpoint uses AI to:
+    - Calculate probability score (0-100)
+    - Consider multiple success factors
+    - Provide detailed interpretation
+    - Make recommendations based on score
+
+    Returns success probability with detailed breakdown.
+    """
+    try:
+        logger.info(f"🎯 Application Manager: Estimating success probability for {request.status}")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Prepare signals data
+        signals = f"{request.status}|{request.response_time}|{request.sentiment}|{request.recruiter_engagement}|{request.company_size}|{request.role_match}"
+
+        # Estimate probability
+        prompt = f"Use estimate_success_probability tool with this data: {signals}"
+        result = await agent.execute(prompt)
+
+        logger.info(f"✅ Success probability estimated")
+
+        return ApplicationManagerResponse(
+            success=True,
+            analysis=result.get('output', ''),
+            metadata={"status": request.status, "role_match": request.role_match}
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error estimating success probability: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error estimating probability: {str(e)}"
+        )
+
+
+@router.get("/application-manager/stats", response_model=AgentStatsResponse)
+async def get_application_manager_stats(db: DatabaseManager = Depends(get_db)):
+    """
+    Get statistics and status information for the Application Manager Agent.
+
+    Returns:
+    - Agent name and configuration
+    - Number of executions
+    - Available tools count
+    - Memory usage
+    - Performance metrics
+    """
+    try:
+        logger.info("📊 Application Manager: Getting agent statistics")
+
+        # Create agent
+        agent = create_application_manager_agent(db)
+
+        # Get statistics
+        stats = agent.get_stats()
+
+        return AgentStatsResponse(
+            name=stats['name'],
+            execution_count=stats['execution_count'],
+            tools_count=stats['tools_count'],
+            memory_size=stats['memory_size'],
+            uptime=stats.get('uptime')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error getting Application Manager stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting agent stats: {str(e)}"
+        )
 
 
 # Job Hunter Agent Endpoints
