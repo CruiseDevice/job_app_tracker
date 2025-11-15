@@ -154,26 +154,6 @@ async def get_websocket_stats():
     """Get WebSocket connection statistics"""
     return websocket_manager.get_connection_stats()
 
-@app.post("/api/monitoring/start")
-async def start_monitoring():
-    """Start email monitoring"""
-    await email_monitor.start_monitoring()
-    return {"message": "Email monitoring started", "status": "success"}
-
-@app.post("/api/monitoring/stop")
-async def stop_monitoring():
-    """Stop email monitoring"""
-    await email_monitor.stop_monitoring()
-    return {"message": "Email monitoring stopped", "status": "success"}
-
-@app.get("/api/monitoring/status")
-async def get_monitoring_status():
-    """Get current monitoring status"""
-    return {
-        "isMonitoring": email_monitor.is_running,
-        "connections": len(websocket_manager.active_connections)
-    }
-
 
 if __name__ == "__main__":
     import uvicorn

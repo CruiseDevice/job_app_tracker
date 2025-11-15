@@ -531,14 +531,14 @@ python main.py
 ### 8.2 Running Tests
 
 ```bash
-# Unit + Mock tests (no API key needed)
-python tests/test_followup_agent.py
+# Run specific agent test
+python backend/tests/test_followup_agent.py
 
-# Full test suite with API (requires .env file)
+# Full test suite (requires .env file with API keys)
 python -m pytest backend/tests/ -v
 
-# Specific test
-python test_email_analyst_comprehensive.py --manual
+# Run specific test file
+python backend/tests/test_email_job_matching.py
 ```
 
 ---
