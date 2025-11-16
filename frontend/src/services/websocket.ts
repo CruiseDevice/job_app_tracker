@@ -129,9 +129,19 @@ class WebSocketService {
     // Handle system messages
     switch (message.type) {
       case 'NEW_APPLICATION':
-        console.log('📋 New application received:', message.payload.company);
-        store.dispatch(addApplicationFromWebSocket(message.payload as ApplicationPayload));
-        this.showNotification('New Application', `${message.payload.company} - ${message.payload.position}`);
+        // Handle consolidated payload (application + statistics)
+        const appData = message.payload.application || message.payload;
+        const stats = message.payload.statistics;
+        
+        console.log('📋 New application received:', appData.company);
+        store.dispatch(addApplicationFromWebSocket(appData as ApplicationPayload));
+        this.showNotification('New Application', `${appData.company} - ${appData.position}`);
+        
+        // If statistics are included, update them too
+        if (stats) {
+          console.log('📊 Statistics updated from new application');
+          store.dispatch(updateStatisticsFromWebSocket(stats as StatisticsPayload));
+        }
         break;
 
       case 'APPLICATION_UPDATED':
