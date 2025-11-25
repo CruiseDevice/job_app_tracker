@@ -70,54 +70,56 @@ BaseAgent (Abstract Base Class)
 **Statistics:**
 - `get_stats()`: Returns dict with execution_count, tools_count, memory_size, etc.
 
+**Monitoring Integration:**
+- `performance_monitor`: Global performance monitor for tracking execution metrics
+- `cost_tracker`: Global cost tracker for API usage and costs
+- Structured logging with correlation IDs and execution tracking
+
 ---
 
 ## 2. EXISTING AGENTS STRUCTURE
 
-### 2.1 Email Analyst Agent (`backend/agents_framework/agents/email_analyst_agent.py`)
+### 2.1 Current Status
 
-**Configuration:**
+**No specialized agents are currently implemented.** The `backend/agents_framework/agents/` directory contains only the `__init__.py` file, which states that agents can be added as they are developed.
+
+**Framework Ready:**
+- BaseAgent class is fully implemented and ready for use
+- Tool system is functional with reusable base tools
+- Memory systems (conversation + RAG) are available
+- Monitoring and cost tracking systems are integrated
+
+**To Create a New Agent:**
+1. Create a new file in `backend/agents_framework/agents/`
+2. Inherit from `BaseAgent`
+3. Implement `_register_tools()` and `get_system_prompt()`
+4. Add the agent to `agents/__init__.py` exports
+
+**Example Agent Structure:**
 ```python
-config = AgentConfig(
-    name="Email Analyst",
-    description="Analyzes job-related emails...",
-    model="gpt-4o-mini",
-    temperature=0.1,  # Low temp - analytical
-    max_iterations=8,
-    enable_memory=True,
-    memory_k=15
-)
+from agents_framework.core.base_agent import BaseAgent, AgentConfig
+
+class MyCustomAgent(BaseAgent):
+    def __init__(self, db_manager):
+        config = AgentConfig(
+            name="My Agent",
+            description="Does something useful",
+            model="gpt-4o-mini",
+            temperature=0.1,
+            max_iterations=10,
+            enable_memory=True,
+            memory_k=15
+        )
+        self.db = db_manager
+        super().__init__(config)
+    
+    def _register_tools(self) -> None:
+        # Register tools here
+        pass
+    
+    def get_system_prompt(self) -> str:
+        return "You are a helpful agent that..."
 ```
-
-**Tools Registered (7 total):**
-1. `analyze_email_sentiment` - Detects sentiment (positive/negative/neutral), urgency
-2. `extract_action_items` - Extracts tasks and deadlines using regex patterns
-3. `categorize_email` - Classifies email type (interview, rejection, offer, assessment, etc.)
-4. `extract_company_position` - Extracts company name and job position
-5. `find_matching_applications` - Searches database for related applications
-6. `analyze_email_thread` - Analyzes multi-email conversations for progression
-
-**Memory System:**
-- `conversation_memory`: AgentMemoryManager instance
-- `rag_memory`: RAGMemoryManager for semantic storage (ChromaDB)
-- Stores analyses in RAG for learning
-
-**Public Methods:**
-```python
-async def analyze_email(subject, body, sender="", metadata=None) -> Dict
-    # Analyzes single email
-    # Returns: success, analysis, metadata, error
-
-async def analyze_thread(emails: List[Dict], metadata=None) -> Dict
-    # Analyzes email conversation thread
-    # Returns: success, analysis, email_count, metadata, error
-```
-
-**System Prompt Focus:**
-- Reasoning and analysis
-- Using tools systematically
-- Extracting actionable insights
-- Understanding context and patterns
 
 ---
 
@@ -172,11 +174,15 @@ def _register_tools(self) -> None:
 **Tool Classes (Reusable):**
 - `DatabaseTools`: get_all_applications, get_by_id, update_status, search_applications
 - `EmailTools`: analyze_sentiment, extract_action_items
+- `AnalyticsTools`: get_application_statistics
 - `UtilityTools`: get_current_datetime, calculate_days_since
 
-**Legacy Support:**
-- Tools can be created as LangChain `Tool` objects
-- or using `@tool` decorator (preferred for new agents)
+**Tool Creation:**
+- `create_standard_toolset()`: Factory function to create a standard set of tools
+- Tools can be created as LangChain `Tool` objects (legacy)
+- Preferred: Use `@tool` decorator via `BaseAgent.add_tool()` method
+
+**Note:** The base_tools.py uses the legacy LangChain `Tool` API. New agents should use the `@tool` decorator approach through `BaseAgent.add_tool()` for better compatibility with LangGraph.
 
 ---
 
@@ -184,29 +190,54 @@ def _register_tools(self) -> None:
 
 ### 4.1 Route Structure (`backend/api/routes/agents.py`)
 
-**Pattern - Email Analyst Endpoints:**
+**Current Status:**
+The `agents.py` route file exists but is currently a placeholder. It contains:
+- Basic router setup
+- `AgentStatsResponse` model definition
+- Comments indicating where future agent endpoints can be added
+
+**Pattern for Future Agent Endpoints:**
+
+When implementing agent endpoints, follow this structure:
 
 ```
-POST /api/agents/email-analyst/analyze
-├── Request: EmailAnalysisRequest (subject, body, sender, metadata)
-├── Process: Create agent → Call agent.analyze_email()
-└── Response: EmailAnalysisResponse (success, analysis, metadata, error)
+POST /api/agents/{agent-name}/{action}
+├── Request: AgentRequest (Pydantic model with required fields)
+├── Process: Create agent → Call agent method
+└── Response: AgentResponse (success, output, metadata, error)
 
-POST /api/agents/email-analyst/analyze-thread
-├── Request: EmailThreadAnalysisRequest (emails: List, metadata)
-├── Process: Validate → Create agent → Call agent.analyze_thread()
-└── Response: EmailThreadAnalysisResponse (success, analysis, email_count, metadata, error)
-
-GET /api/agents/email-analyst/stats
+GET /api/agents/{agent-name}/stats
 ├── Process: Create agent → Call agent.get_stats()
 └── Response: AgentStatsResponse (name, execution_count, tools_count, memory_size)
 
-WebSocket /api/agents/email-analyst/ws
+WebSocket /api/agents/{agent-name}/ws
 ├── Message Types:
-│   ├── "analyze" → Single email analysis
-│   ├── "analyze_thread" → Thread analysis
+│   ├── "{action}" → Execute agent action
 │   ├── "ping" → Heartbeat
-│   └── Response: "analysis_started", "analysis_complete", "analysis_error"
+│   └── Response: "{action}_started", "{action}_complete", "{action}_error"
+```
+
+**Example Implementation Pattern:**
+```python
+@router.post("/{agent_name}/run")
+async def run_agent(
+    agent_name: str,
+    request: AgentRequest,
+    db: DatabaseManager = Depends(get_db)
+):
+    # Create agent instance
+    agent = create_agent(agent_name, db)
+    
+    # Run agent
+    response = await agent.run(request.input_text, request.context)
+    
+    # Return response
+    return AgentResponse(
+        success=response.success,
+        output=response.output,
+        metadata=response.metadata,
+        error=response.error
+    )
 ```
 
 ### 4.2 Request/Response Models (Pydantic)
@@ -275,21 +306,41 @@ class AgentResponse(BaseModel):
 **RAGMemoryManager:**
 - Uses ChromaDB for vector storage and semantic search
 - Stores: Experience data with embeddings
-- Methods: store_experience, retrieve_relevant, get_stats
+- Methods: `store_experience()`, `retrieve_similar()`, `get_context_for_query()`, `get_stats()`
 - Persists to: `./data/chroma` directory
+
+**VectorMemoryStore:**
+- Low-level vector storage interface
+- Methods: `add()`, `search()`, `get()`, `delete()`, `count()`
+- Supports metadata filtering and batch operations
 
 **Agent Usage:**
 ```python
+# Initialize RAG memory
+from agents_framework.memory.vector_memory import RAGMemoryManager
+
+self.rag_memory = RAGMemoryManager(agent_name="MyAgent")
+
+# Store experiences
 self.rag_memory.store_experience(
     experience="What I learned from this...",
-    category="email_analysis",  # For filtering
-    tags=["company", "context"]  # For search
+    category="analysis",  # For filtering
+    tags=["company", "context"],  # For search
+    metadata={"key": "value"}
 )
 
-memories = self.rag_memory.retrieve_relevant(
+# Retrieve similar memories
+memories = self.rag_memory.retrieve_similar(
     query="Similar past analysis?",
-    category="email_analysis",
+    category="analysis",
     limit=5
+)
+
+# Get formatted context
+context = self.rag_memory.get_context_for_query(
+    query="What did I learn?",
+    category="analysis",
+    limit=3
 )
 ```
 
@@ -314,13 +365,26 @@ Dashboard Component
 └── Additional Sections (Stats, Guidelines, Tips)
 ```
 
-### 6.2 Components (`frontend/src/components/Agents/`)
+### 6.2 Components (`frontend/src/components/`)
 
-**Email Analyst Components:**
-- `EmailAnalystDashboard.tsx`: Main dashboard
-- `EmailAnalysisCard.tsx`: Results display
-- `SentimentBadge.tsx`: Sentiment indicator
-- `ActionItemsList.tsx`: Extracted tasks
+**Current Frontend Structure:**
+- `Applications/`: Application management components
+- `Dashboard/`: Main dashboard and statistics
+- `Layout/`: Layout wrapper components
+- `Matching/`: Email-job matching components
+- `Settings/`: Settings and configuration
+- `common/`: Shared UI components (Loading, ErrorBoundary, etc.)
+
+**Note:** No `Agents/` directory currently exists. When implementing agent UIs, create components following the dashboard pattern described above.
+
+**Example Agent Component Structure (for future implementation):**
+```
+Agents/
+├── {AgentName}Dashboard.tsx    # Main dashboard
+├── {AgentName}InputCard.tsx     # Input form
+├── {AgentName}ResultsCard.tsx   # Results display
+└── {AgentName}StatsCard.tsx     # Statistics display
+```
 
 ### 6.3 Common Patterns
 
@@ -395,13 +459,18 @@ const handleSubmit = async () => {
 
 ### 7.2 Test Coverage
 
-**Email Analyst Tests:**
-- Sentiment detection (positive/negative/neutral)
-- Action item extraction
-- Email categorization
-- Company/position extraction
-- Thread analysis
-- Agent statistics
+**Current Test Files:**
+- `test_email_job_matching.py`: Tests for email-job matching functionality
+- `test_phase10_integration.py`: Integration tests for Phase 10 features
+
+**Test Coverage for Future Agents:**
+When implementing agents, create tests covering:
+- Agent initialization and configuration
+- Tool registration and execution
+- Memory management (conversation + RAG)
+- Error handling and edge cases
+- Agent statistics and monitoring
+- Integration with database and external services
 
 ---
 
