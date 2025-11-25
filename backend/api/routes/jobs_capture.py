@@ -190,6 +190,7 @@ async def capture_job_data(
             "notes": f"Captured via browser extension from {job_request.job_board}",
             
             # Extension-specific fields
+            "source_type": "extension",  # Explicitly mark as extension capture
             "job_board": job_request.job_board,
             "captured_at": datetime.fromisoformat(job_request.captured_at.replace('Z', '+00:00')) if job_request.captured_at else datetime.now(),
             "extraction_data": job_request.extraction_data,
@@ -227,10 +228,22 @@ async def capture_job_data(
             "captured_at": saved_application.created_at.isoformat() if saved_application.created_at else None
         }
 
+        # Get updated statistics for response and WebSocket broadcast
+        # IMPORTANT: Get statistics AFTER the job is saved and committed
+        stats = await db.get_statistics()
+        logger.info(f"📊 Statistics after capture - today: {stats.get('today', 0)}, total: {stats.get('total', 0)}")
+        logger.info(f"📊 Full statistics object: {stats}")
+        
+        # Verify the saved application's application_date
+        if saved_application.application_date:
+            logger.info(f"📅 Saved application_date: {saved_application.application_date}")
+            logger.info(f"📅 Saved application_date date part: {saved_application.application_date.date()}")
+            logger.info(f"📅 Today's date: {datetime.now().date()}")
+            logger.info(f"📅 Dates match: {saved_application.application_date.date() == datetime.now().date()}")
+        
         # Broadcast consolidated real-time update via WebSocket
         # Send both new application and updated statistics in a single broadcast
         try:
-            stats = await db.get_statistics()
             await websocket_manager.broadcast({
                 "type": "NEW_APPLICATION",
                 "payload": {
@@ -242,6 +255,10 @@ async def capture_job_data(
         except Exception as ws_error:
             logger.error(f"❌ WebSocket broadcast failed: {ws_error}")
             # Don't fail the request if WebSocket fails
+
+        # Include statistics in response data for immediate popup update
+        response_data["statistics"] = stats
+        logger.info(f"📤 Response data includes statistics: {response_data.get('statistics', {}).get('today', 'N/A')}")
 
         return JobCaptureResponse(
             success=True,

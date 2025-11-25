@@ -440,10 +440,30 @@ class DatabaseManager:
             # Get total applications
             total = session.query(JobApplication).count()
             
-            # Get today's applications
+            # Get today's applications (using date range for better reliability)
+            # Use application_date since it's explicitly set to datetime.now() in capture endpoint
+            # This avoids timezone issues with created_at which is set by database server
+            today_start = datetime.combine(today_date, datetime.min.time())
+            tomorrow_start = datetime.combine(today_date + timedelta(days=1), datetime.min.time())
+            
+            # Debug: Check what dates we're comparing
+            logger.info(f"📊 Statistics query - today_date: {today_date}, today_start: {today_start}, tomorrow_start: {tomorrow_start}")
+            
+            # Get all applications to debug
+            all_apps = session.query(JobApplication).all()
+            logger.info(f"📊 Total applications in DB: {len(all_apps)}")
+            
+            # Check application_date values
+            for app in all_apps[-5:]:  # Last 5 apps
+                if app.application_date:
+                    logger.info(f"📊 App {app.id}: application_date={app.application_date}, date={app.application_date.date()}, in_range={today_start <= app.application_date < tomorrow_start}")
+            
             today_count = session.query(JobApplication).filter(
-                func.date(JobApplication.created_at) == today_date
+                JobApplication.application_date >= today_start,
+                JobApplication.application_date < tomorrow_start
             ).count()
+            
+            logger.info(f"📊 Today's count result: {today_count} (date range: {today_start} to {tomorrow_start})")
             
             # Get this week's applications
             this_week = session.query(JobApplication).filter(
@@ -1090,13 +1110,13 @@ class DatabaseManager:
             # Get basic application statistics (existing functionality)
             total = session.query(JobApplication).count()
             today_count = session.query(JobApplication).filter(
-                func.date(JobApplication.created_at) == today_date
+                func.date(JobApplication.application_date) == today_date
             ).count()
             this_week = session.query(JobApplication).filter(
-                JobApplication.created_at >= this_week_start
+                func.date(JobApplication.application_date) >= this_week_start
             ).count()
             this_month = session.query(JobApplication).filter(
-                JobApplication.created_at >= this_month_start
+                func.date(JobApplication.application_date) >= this_month_start
             ).count()
             
             # Status distribution
@@ -1132,7 +1152,7 @@ class DatabaseManager:
             
             # Average per day
             thirty_days_ago = now - timedelta(days=30)
-            recent_applications = session.query(JobApplication).filter(JobApplication.created_at >= thirty_days_ago).count()
+            recent_applications = session.query(JobApplication).filter(JobApplication.application_date >= thirty_days_ago).count()
             avg_per_day = recent_applications / 30 if recent_applications > 0 else 0
 
             # Top companies

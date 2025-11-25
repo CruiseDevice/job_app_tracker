@@ -133,6 +133,7 @@ class WebSocketService {
         
         // If statistics are included, update them too
         if (stats) {
+          console.log('📊 Updating statistics via WebSocket:', stats);
           store.dispatch(updateStatisticsFromWebSocket(stats as StatisticsPayload));
         }
         break;

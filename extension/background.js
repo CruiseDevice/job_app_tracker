@@ -126,6 +126,13 @@ class JobTrackerBackground {
                   sendResponse({ count: newCount });
                   break;
 
+              case 'pageAnalyzed':
+                  // Content script notifies about page analysis
+                  // This is informational, no action needed in background
+                  console.log('📄 Page analyzed:', message.isJobPage ? 'Job page detected' : 'Not a job page');
+                  sendResponse({ success: true, acknowledged: true });
+                  break;
+
               default:
                   console.warn('❓ Unknown message action:', message.action);
                   sendResponse({ success: false, error: 'Unknown action' });

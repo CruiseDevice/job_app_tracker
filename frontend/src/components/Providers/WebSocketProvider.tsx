@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, createContext, useContext } from 'react';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
-import { addApplicationFromWebSocket, updateApplicationFromWebSocket } from '../../store/slices/applicationsSlice';
+import { updateApplicationFromWebSocket } from '../../store/slices/applicationsSlice';
 import { updateStatisticsFromWebSocket } from '../../store/slices/statisticsSlice';
 import { setMonitoringStatus } from '../../store/slices/monitorSlice';
 import { webSocketService } from '../../services/websocket';
@@ -11,7 +11,7 @@ import { toast } from 'react-hot-toast';
 interface WebSocketContextType {
   isConnected: boolean;
   connectionState: string;
-  sendMessage: (message: any) => void;
+  sendMessage: (message: Record<string, unknown>) => void;
   startMonitoring: () => void;
   stopMonitoring: () => void;
 }
@@ -36,13 +36,23 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
   const handleMessage = useCallback((message: WebSocketMessage) => {
     switch (message.type) {
-      case 'NEW_APPLICATION':
-        dispatch(addApplicationFromWebSocket(message.payload));
+      case 'NEW_APPLICATION': {
+        // Handle consolidated payload (application + statistics)
+        // Note: websocket.ts already dispatches the action, but we dispatch here too as backup
+        const appData = message.payload.application || message.payload;
+        const stats = message.payload.statistics;
+        
         toast.success(
-          `New application: ${message.payload.company} - ${message.payload.position}`,
+          `New application: ${appData.company} - ${appData.position}`,
           { duration: 5000, icon: '📋' }
         );
+        
+        // Update statistics if included in payload
+        if (stats) {
+          dispatch(updateStatisticsFromWebSocket(stats));
+        }
         break;
+      }
 
       case 'APPLICATION_UPDATED':
         dispatch(updateApplicationFromWebSocket(message.payload));
@@ -87,7 +97,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const contextValue: WebSocketContextType = {
     isConnected,
     connectionState: webSocketService.getConnectionState(),
-    sendMessage: (message: any) => webSocketService.send(message),
+    sendMessage: (message: Record<string, unknown>) => webSocketService.send(message),
     startMonitoring: () => webSocketService.send({ type: 'start_monitoring' }),
     stopMonitoring: () => webSocketService.send({ type: 'stop_monitoring' })
   };
