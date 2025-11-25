@@ -57,13 +57,11 @@ class WebSocketService {
       }
 
       this.isConnecting = true;
-      console.log('🔌 Connecting to WebSocket...');
 
       try {
         this.ws = new WebSocket('ws://localhost:8000/ws');
 
         this.ws.onopen = () => {
-          console.log('✅ WebSocket connected successfully');
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           
@@ -87,7 +85,6 @@ class WebSocketService {
         };
 
         this.ws.onclose = (event) => {
-          console.log('🔌 WebSocket disconnected', event.code, event.reason);
           this.isConnecting = false;
           this.stopHeartbeat();
           
@@ -124,8 +121,6 @@ class WebSocketService {
   }
 
   private handleMessage(message: WebSocketMessage) {
-    console.log('📨 WebSocket message received:', message.type);
-
     // Handle system messages
     switch (message.type) {
       case 'NEW_APPLICATION':
@@ -133,34 +128,29 @@ class WebSocketService {
         const appData = message.payload.application || message.payload;
         const stats = message.payload.statistics;
         
-        console.log('📋 New application received:', appData.company);
         store.dispatch(addApplicationFromWebSocket(appData as ApplicationPayload));
         this.showNotification('New Application', `${appData.company} - ${appData.position}`);
         
         // If statistics are included, update them too
         if (stats) {
-          console.log('📊 Statistics updated from new application');
           store.dispatch(updateStatisticsFromWebSocket(stats as StatisticsPayload));
         }
         break;
 
       case 'APPLICATION_UPDATED':
-        console.log('📝 Application updated:', message.payload.id);
         store.dispatch(updateApplicationFromWebSocket(message.payload as ApplicationPayload));
         break;
 
       case 'STATISTICS_UPDATED':
-        console.log('📊 Statistics updated');
         store.dispatch(updateStatisticsFromWebSocket(message.payload as StatisticsPayload));
         break;
 
       case 'MONITORING_STATUS':
-        console.log('👁️ Monitoring status:', message.payload.isMonitoring ? 'Active' : 'Inactive');
         store.dispatch(setMonitoringStatus(message.payload.isMonitoring));
         break;
 
       case 'CONNECTION_STATUS':
-        console.log('🔗 Connection status update:', message.payload);
+        // Connection status update handled by store
         break;
 
       default:
@@ -181,8 +171,6 @@ class WebSocketService {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
-      
-      console.log(`🔄 Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       setTimeout(() => {
         if (!this.isConnected()) {
@@ -276,8 +264,6 @@ class WebSocketService {
   }
 
   disconnect() {
-    console.log('🔌 Manually disconnecting WebSocket...');
-    
     this.stopHeartbeat();
     
     if (this.ws) {

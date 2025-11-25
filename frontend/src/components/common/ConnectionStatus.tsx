@@ -1,11 +1,11 @@
 import React from 'react';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { webSocketService } from '../../services/websocket';
-import isConnected from '../../services/websocket'
 
 export const ConnectionStatus: React.FC = () => {
   const is_monitoring  = useAppSelector(state => state.monitor);
   const connectionState = webSocketService.getConnectionState();
+  const isConnected = webSocketService.isConnected();
 
   const getStatusColor = () => {
     if (isConnected && is_monitoring) return 'text-green-500';

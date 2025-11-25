@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { Plus, Play, Square, Settings, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { fetchApplications, addApplication } from '../../store/slices/applicationsSlice';
@@ -12,6 +14,7 @@ import type { CreateApplicationRequest } from '../../types/application';
 
 const QuickActions: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { is_monitoring } = useAppSelector(state => state.monitor);
   const [isToggling, setIsToggling] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -22,12 +25,14 @@ const QuickActions: React.FC = () => {
     try {
       if (is_monitoring) {
         await dispatch(stopMonitoring()).unwrap();
+        toast.success('Monitoring stopped');
       } else {
         await dispatch(startMonitoring()).unwrap();
+        toast.success('Monitoring started');
       }
     } catch (error) {
       console.error('Error toggling monitoring:', error);
-      // TODO: Show error toast
+      toast.error('Failed to toggle monitoring');
     } finally {
       setIsToggling(false);
     }
@@ -40,9 +45,10 @@ const QuickActions: React.FC = () => {
         dispatch(fetchApplications({ skip: 0, limit: 10 })).unwrap(),
         dispatch(fetchStatistics()).unwrap()
       ]);
+      toast.success('Data refreshed');
     } catch (error) {
       console.error('Error refreshing data:', error);
-      // TODO: Show error toast
+      toast.error('Failed to refresh data');
     } finally {
       setIsRefreshing(false);
     }
@@ -97,8 +103,7 @@ const QuickActions: React.FC = () => {
       icon: Settings,
       color: 'bg-purple-500 hover:bg-purple-600',
       onClick: () => {
-        // TODO: Navigate to settings or open settings modal
-        console.log('Open settings');
+        navigate('/settings');
       }
     }
   ];

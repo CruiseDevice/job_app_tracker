@@ -895,12 +895,18 @@ class DatabaseManager:
         """
         Get count of job-related emails that aren't linked to applications
         
+        NOTE: This is a placeholder method. It requires an emails table to be implemented
+        in the database schema. Currently returns 0.
+        
         Returns:
-            Number of unlinked emails
+            Number of unlinked emails (currently always 0)
         """
         session = self.get_session()
         try:
-            # This would require an emails table to work properly
+            # TODO: Implement when emails table is added to schema
+            # This would require:
+            # 1. An EmailRecord table with job_related flag
+            # 2. A join with EmailJobLink to find unlinked emails
             # For now, return 0 as placeholder
             return 0
             

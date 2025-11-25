@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Mail, CheckCircle, X, AlertCircle, BarChart3, Zap, Settings, RefreshCw } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { EmailJobLink, MatchSuggestion, MatchingStatistics, BulkMatchingResult } from '../../types/matching';
 import type { JobApplication } from '../../types/application';
 
@@ -99,13 +100,15 @@ const EmailJobMatching: React.FC<EmailJobMatchingProps> = () => {
   const loadMatchingData = async () => {
     setLoading(true);
     try {
-      // Simulate API calls
+      // TODO: Replace with actual API calls when endpoints are implemented
+      // For now, using mock data
       await new Promise(resolve => setTimeout(resolve, 1000));
       setLinkedEmails(mockMatchingData.linkedEmails);
       setSuggestions(mockMatchingData.suggestions);
       setStatistics(mockMatchingData.statistics);
     } catch (error) {
       console.error('Error loading matching data:', error);
+      toast.error('Failed to load matching data');
     } finally {
       setLoading(false);
     }
@@ -122,19 +125,22 @@ const EmailJobMatching: React.FC<EmailJobMatchingProps> = () => {
         )
       );
       
-      // TODO: Make API call
-      console.log(`Verifying link ${linkId}`);
+      // TODO: Make API call when endpoint is implemented
+      toast.success('Link verified');
     } catch (error) {
       console.error('Error verifying link:', error);
+      toast.error('Failed to verify link');
     }
   };
 
   const handleRejectLink = async (linkId: number) => {
     try {
       setLinkedEmails(links => links.filter(link => link.id !== linkId));
-      console.log(`Rejecting link ${linkId}`);
+      // TODO: Make API call when endpoint is implemented
+      toast.success('Link rejected');
     } catch (error) {
       console.error('Error rejecting link:', error);
+      toast.error('Failed to reject link');
     }
   };
 
@@ -155,9 +161,11 @@ const EmailJobMatching: React.FC<EmailJobMatchingProps> = () => {
       );
       
       setSelectedLinks(new Set());
-      console.log(`Bulk verified ${linkIds.length} links`);
+      // TODO: Make API call when endpoint is implemented
+      toast.success(`Verified ${linkIds.length} link(s)`);
     } catch (error) {
       console.error('Error in bulk verify:', error);
+      toast.error('Failed to verify links');
     } finally {
       setBulkProcessing(false);
     }
@@ -171,9 +179,11 @@ const EmailJobMatching: React.FC<EmailJobMatchingProps> = () => {
       const linkIds = Array.from(selectedLinks);
       setLinkedEmails(links => links.filter(link => !linkIds.includes(link.id)));
       setSelectedLinks(new Set());
-      console.log(`Bulk rejected ${linkIds.length} links`);
+      // TODO: Make API call when endpoint is implemented
+      toast.success(`Rejected ${linkIds.length} link(s)`);
     } catch (error) {
       console.error('Error in bulk reject:', error);
+      toast.error('Failed to reject links');
     } finally {
       setBulkProcessing(false);
     }
@@ -202,21 +212,24 @@ const EmailJobMatching: React.FC<EmailJobMatchingProps> = () => {
       };
       
       setLinkedEmails(prev => [newLink, ...prev]);
-      console.log(`Accepted suggestion: ${suggestion.email_id} → job ${suggestion.job_id}`);
+      // TODO: Make API call when endpoint is implemented
+      toast.success('Suggestion accepted');
     } catch (error) {
       console.error('Error accepting suggestion:', error);
+      toast.error('Failed to accept suggestion');
     }
   };
 
   const handleRejectSuggestion = (emailId: string) => {
     setSuggestions(prev => prev.filter(s => s.email_id !== emailId));
-    console.log(`Rejected suggestion: ${emailId}`);
+    // TODO: Make API call when endpoint is implemented
+    toast.success('Suggestion rejected');
   };
 
   const handleBulkMatching = async () => {
     setBulkProcessing(true);
     try {
-      // TODO: Make API call for bulk matching
+      // TODO: Make API call for bulk matching when endpoint is implemented
       const result: BulkMatchingResult = {
         jobs_processed: 25,
         matches_found: 8,
@@ -226,9 +239,10 @@ const EmailJobMatching: React.FC<EmailJobMatchingProps> = () => {
       };
       
       await loadMatchingData(); // Refresh data
-      console.log('Bulk matching result:', result);
+      toast.success(`Bulk matching completed: ${result.matches_found} matches found`);
     } catch (error) {
       console.error('Error in bulk matching:', error);
+      toast.error('Failed to run bulk matching');
     } finally {
       setBulkProcessing(false);
     }

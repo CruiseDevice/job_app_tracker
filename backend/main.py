@@ -26,11 +26,9 @@ os.environ["APPDATA"] = str(_crewai_storage)
 # NOW import everything else
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
-from config.settings import settings as app_settings
 from services.websocket_manager import manager as websocket_manager
 from agent.email_monitor import EmailMonitor
 from database.database_manager import DatabaseManager
