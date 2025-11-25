@@ -25,6 +25,17 @@ class JobTrackerPopup {
   }
 
   async init() {
+    // Verify all elements are found
+    console.log('🔍 Initializing popup, checking elements...');
+    console.log('📋 todayCount element:', this.elements.todayCount);
+    if (!this.elements.todayCount) {
+      console.error('❌ CRITICAL: todayCount element not found!');
+      console.error('📋 Available elements:', Object.keys(this.elements));
+    } else {
+      console.log('✅ todayCount element found:', this.elements.todayCount);
+      console.log('📋 Current value:', this.elements.todayCount.textContent);
+    }
+    
     // set up event listeners
     this.setupEventListeners();
 
@@ -53,7 +64,26 @@ class JobTrackerPopup {
     // Listen for messages from content script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       this.handleMessage(message, sender, sendResponse);
+      return true; // Keep message channel open for async responses
     });
+  }
+
+  handleMessage(message, sender, sendResponse) {
+    // Handle messages from content script or background
+    switch (message.action) {
+      case 'pageAnalyzed':
+        // Content script analyzed the page - update popup if open
+        if (message.isJobPage && message.jobData) {
+          this.currentPageData = message.jobData;
+          this.updatePageStatus(`Job page detected: ${message.jobData.company || 'Unknown Company'}`, true);
+          this.elements.captureBtn.disabled = false;
+        }
+        sendResponse({ success: true });
+        break;
+      default:
+        // Unknown message, ignore
+        sendResponse({ success: false });
+    }
   }
 
   showMessage(text, type='info') {
@@ -104,13 +134,30 @@ class JobTrackerPopup {
 
   async updateTodayCount() {
     try {
+      // Verify element exists
+      if (!this.elements.todayCount) {
+        console.error('❌ todayCount element not found in updateTodayCount!');
+        return;
+      }
+      
+      console.log('🔄 Fetching statistics from API...');
       const response = await fetch(`${this.backendUrl}/api/statistics`);
       if (response.ok) {
           const stats = await response.json();
-          this.elements.todayCount.textContent = stats.today || 0;
+          const count = stats.today || 0;
+          console.log('📊 Statistics from API:', stats);
+          console.log('🔢 Today count:', count);
+          console.log('🎯 Element before update:', this.elements.todayCount.textContent);
+          this.elements.todayCount.textContent = count.toString();
+          console.log('🎯 Element after update:', this.elements.todayCount.textContent);
+          console.log('✅ Updated today count to:', count);
+      } else {
+          console.error('❌ Failed to fetch statistics:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
       }
     } catch (error) {
-      console.error('Error fetching today count:', error);
+      console.error('❌ Error fetching today count:', error);
     }
   }
 
@@ -150,10 +197,41 @@ class JobTrackerPopup {
 
       if (response.ok) {
         const result = await response.json();
+        console.log('📥 Capture response:', result);
+        console.log('📦 Full response structure:', JSON.stringify(result, null, 2));
         
         this.showMessage(`Successfully captured: ${jobData.company} - ${jobData.position}`, 'success');
         this.updateLastCapture(jobData);
-        await this.updateTodayCount();
+        
+        // Verify element exists
+        if (!this.elements.todayCount) {
+          console.error('❌ todayCount element not found!');
+          return;
+        }
+        
+        // Update count from response if available, otherwise fetch
+        let countUpdated = false;
+        if (result && result.data && result.data.statistics) {
+          const count = result.data.statistics.today || 0;
+          console.log('📊 Statistics from response:', result.data.statistics);
+          console.log('🔢 Today count from statistics:', count);
+          console.log('🎯 Element before update:', this.elements.todayCount.textContent);
+          this.elements.todayCount.textContent = count.toString();
+          console.log('🎯 Element after update:', this.elements.todayCount.textContent);
+          console.log('✅ Updated today count from response:', count);
+          countUpdated = true;
+        } else {
+          console.warn('⚠️ No statistics in response, checking structure...');
+          console.log('📦 result:', result);
+          console.log('📦 result.data:', result?.data);
+          console.log('📦 result.data?.statistics:', result?.data?.statistics);
+        }
+        
+        // Fallback: fetch statistics if not in response or update failed
+        if (!countUpdated) {
+          console.log('🔄 Fetching statistics separately...');
+          await this.updateTodayCount();
+        }
         
       } else {
         const error = await response.json();

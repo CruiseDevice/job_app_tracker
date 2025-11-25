@@ -26,6 +26,7 @@ const statisticsSlice = createSlice({
   initialState,
   reducers: {
     updateStatisticsFromWebSocket: (state, action) => {
+      console.log('📊 Statistics slice updating with:', action.payload);
       state.stats = action.payload;
     },
   },
