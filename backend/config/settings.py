@@ -22,11 +22,25 @@ class Settings(BaseSettings):
     
     # OpenAI API
     openai_api_key: Optional[str] = None
-    
+
+    # SerpAPI for job search
+    serpapi_key: Optional[str] = None
+
     # Email monitoring
     email_check_interval: int = 300  # 5 minutes
     
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
+        extra = "ignore"
 
 settings = Settings()
+
+# Print loaded environment variables for debugging (only in development)
+if settings.debug:
+    import sys
+    if hasattr(sys, 'ps1') or 'uvicorn' in sys.modules:
+        print(f"🔑 Loaded settings:")
+        print(f"   - SERPAPI_KEY: {'✓ Set' if settings.serpapi_key else '✗ Not set'}")
+        print(f"   - OPENAI_API_KEY: {'✓ Set' if settings.openai_api_key else '✗ Not set'}")

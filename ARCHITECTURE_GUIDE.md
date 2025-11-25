@@ -95,8 +95,7 @@ config = AgentConfig(
 3. `categorize_email` - Classifies email type (interview, rejection, offer, assessment, etc.)
 4. `extract_company_position` - Extracts company name and job position
 5. `find_matching_applications` - Searches database for related applications
-6. `recommend_followup` - Suggests appropriate follow-up actions based on category
-7. `analyze_email_thread` - Analyzes multi-email conversations for progression
+6. `analyze_email_thread` - Analyzes multi-email conversations for progression
 
 **Memory System:**
 - `conversation_memory`: AgentMemoryManager instance
@@ -119,54 +118,6 @@ async def analyze_thread(emails: List[Dict], metadata=None) -> Dict
 - Using tools systematically
 - Extracting actionable insights
 - Understanding context and patterns
-
-### 2.2 Follow-up Agent (`backend/agents_framework/agents/followup_agent.py`)
-
-**Configuration:**
-```python
-config = AgentConfig(
-    name="Follow-up Agent",
-    description="Manages follow-up communications...",
-    model="gpt-4o-mini",
-    temperature=0.3,  # Higher - creative message drafting
-    max_iterations=10,
-    enable_memory=True,
-    memory_k=20
-)
-```
-
-**Tools Registered (7 total):**
-1. `calculate_optimal_timing` - Recommends when to follow up (based on status & days)
-2. `draft_followup_message` - Creates personalized email messages
-3. `get_followup_schedule` - Retrieves past/upcoming follow-ups for a job
-4. `analyze_response_patterns` - Analyzes historical success rates by timing/type
-5. `suggest_followup_strategy` - Recommends complete multi-step follow-up plan
-6. `track_followup_performance` - Tracks engagement metrics (opened, clicked, responded)
-7. `get_followup_templates` - Returns proven message templates with effectiveness ratings
-
-**Timing Rules (Built-in):**
-```
-Status: applied → 5-7 day wait
-Status: interview → 1-3 days (post-interview)
-Status: assessment → 1-2 days (confirm receipt)
-Status: offer → 0-1 day (respond immediately)
-Status: rejected → 1-3 days (thank you & feedback)
-```
-
-**Public Methods:**
-```python
-async def optimize_followup_timing(job_id, status, days_since_contact, 
-                                   application_date, metadata=None) -> Dict
-    # Returns: success, recommendations, metadata, error
-
-async def draft_followup(followup_type, company, position, tone="professional",
-                         context_notes="", metadata=None) -> Dict
-    # Returns: success, message, metadata, error
-
-async def analyze_strategy(status, days_since_application, response_history,
-                          priority="medium", metadata=None) -> Dict
-    # Returns: success, strategy, metadata, error
-```
 
 ---
 
@@ -221,7 +172,6 @@ def _register_tools(self) -> None:
 **Tool Classes (Reusable):**
 - `DatabaseTools`: get_all_applications, get_by_id, update_status, search_applications
 - `EmailTools`: analyze_sentiment, extract_action_items
-- `AnalyticsTools`: get_application_statistics
 - `UtilityTools`: get_current_datetime, calculate_days_since
 
 **Legacy Support:**
@@ -257,28 +207,6 @@ WebSocket /api/agents/email-analyst/ws
 │   ├── "analyze_thread" → Thread analysis
 │   ├── "ping" → Heartbeat
 │   └── Response: "analysis_started", "analysis_complete", "analysis_error"
-```
-
-**Pattern - Follow-up Agent Endpoints:**
-
-```
-POST /api/agents/followup-agent/optimize-timing
-├── Request: FollowUpTimingRequest (job_id, status, days_since_contact, application_date)
-└── Response: FollowUpResponse (success, output, metadata, error)
-
-POST /api/agents/followup-agent/draft-message
-├── Request: FollowUpDraftRequest (followup_type, company, position, tone, context_notes)
-└── Response: FollowUpResponse (success, output, metadata, error)
-
-POST /api/agents/followup-agent/analyze-strategy
-├── Request: FollowUpStrategyRequest (status, days_since_application, response_history, priority)
-└── Response: FollowUpResponse (success, output, metadata, error)
-
-GET /api/agents/followup-agent/stats
-└── Response: AgentStatsResponse
-
-WebSocket /api/agents/followup-agent/ws
-├── Message Types: "optimize_timing", "draft_message", "analyze_strategy", "ping"
 ```
 
 ### 4.2 Request/Response Models (Pydantic)
@@ -392,15 +320,7 @@ Dashboard Component
 - `EmailAnalystDashboard.tsx`: Main dashboard
 - `EmailAnalysisCard.tsx`: Results display
 - `SentimentBadge.tsx`: Sentiment indicator
-- `FollowupRecommendations.tsx`: Suggested actions
 - `ActionItemsList.tsx`: Extracted tasks
-
-**Follow-up Components:**
-- `FollowUpAgentDashboard.tsx`: Main dashboard with tabs
-- `TimingOptimizerCard.tsx`: Timing analysis
-- `MessageDrafterCard.tsx`: Message composition
-- `StrategyPlannerCard.tsx`: Strategy recommendations
-- `FollowUpScheduleCard.tsx`: Schedule management
 
 ### 6.3 Common Patterns
 
@@ -473,30 +393,7 @@ const handleSubmit = async () => {
    - Show agent in action
    - Verify user-facing quality
 
-### 7.2 Example Test Class Pattern
-
-```python
-class TestFollowUpAgent(unittest.IsolatedAsyncioTestCase):
-    
-    @classmethod
-    def setUpClass(cls):
-        cls.has_api_key = bool(os.getenv('OPENAI_API_KEY'))
-    
-    def setUp(self):
-        self.db = DatabaseManager()
-        if self.has_api_key:
-            self.agent = create_followup_agent(self.db)
-    
-    @unittest.skipUnless(os.getenv('OPENAI_API_KEY'), "Requires API key")
-    async def test_specific_feature(self):
-        result = await self.agent.method(params)
-        
-        self.assertTrue(result['success'])
-        self.assertIn('expected_text', result['output'].lower())
-        self.assertEqual(result['email_count'], expected_count)
-```
-
-### 7.3 Test Coverage
+### 7.2 Test Coverage
 
 **Email Analyst Tests:**
 - Sentiment detection (positive/negative/neutral)
@@ -505,15 +402,6 @@ class TestFollowUpAgent(unittest.IsolatedAsyncioTestCase):
 - Company/position extraction
 - Thread analysis
 - Agent statistics
-
-**Follow-up Agent Tests:**
-- Timing optimization (by status)
-- Message drafting (by type)
-- Tone variations
-- Strategy planning (by response history)
-- Priority adjustments
-- Error handling
-- Performance (response time < 30s)
 
 ---
 
@@ -531,9 +419,6 @@ python main.py
 ### 8.2 Running Tests
 
 ```bash
-# Run specific agent test
-python backend/tests/test_followup_agent.py
-
 # Full test suite (requires .env file with API keys)
 python -m pytest backend/tests/ -v
 
