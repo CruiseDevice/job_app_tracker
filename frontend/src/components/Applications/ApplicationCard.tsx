@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ExternalLink, Calendar, MapPin, DollarSign, Clock, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import type { JobApplication, ApplicationStatus } from '../../types/application';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
 import { updateApplicationStatus, updateApplication, deleteApplication } from '../../store/slices/applicationsSlice';
@@ -35,15 +36,6 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
     const date = new Date(adjustedDateString);
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
-    // Debug logging
-    console.log('getTimeAgo FIXED debug:', {
-      original: dateString,
-      adjusted: adjustedDateString,
-      now: now.toISOString(),
-      date: date.toISOString(),
-      diffInHours
-    });
-    
     if (diffInHours < 1) {
       return 'Just now';
     } else if (diffInHours < 24) {
@@ -61,9 +53,10 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
         id: application.id,
         status: newStatus
       })).unwrap();
+      toast.success(`Status updated to ${newStatus}`);
     } catch (error) {
       console.error('Error updating status:', error);
-      // TODO: Show error toast
+      toast.error('Failed to update application status');
     } finally {
       setIsUpdating(false);
     }
@@ -92,9 +85,10 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
     setIsDeleting(true);
     try {
       await dispatch(deleteApplication(application.id)).unwrap();
+      toast.success('Application deleted successfully');
     } catch (error) {
       console.error('Error deleting application:', error);
-      // TODO: Show error toast
+      toast.error('Failed to delete application');
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -104,8 +98,6 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
   const cancelDelete = () => {
     setShowDeleteConfirm(false);
   };
-
-  const statusOptions: ApplicationStatus[] = ['applied', 'interview', 'assessment', 'rejected', 'offer', 'screening'];
 
   return (
     <div className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200 overflow-hidden">

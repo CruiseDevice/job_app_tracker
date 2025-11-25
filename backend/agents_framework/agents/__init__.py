@@ -1,39 +1,9 @@
 """
-Specialized AI Agents
+Agents Framework Initialization
 
-Collection of specialized agents for different tasks.
+This module provides easy access to all agents in the framework.
+
+Currently, no specialized agents are implemented. Agents can be added here
+as they are developed. Each agent should inherit from BaseAgent and follow
+the agent protocol defined in agents_framework.core.agent_protocol.
 """
-
-from agents_framework.agents.email_analyst_agent import (
-    EmailAnalystAgent,
-    create_email_analyst_agent,
-)
-from agents_framework.agents.followup_agent import (
-    FollowUpAgent,
-    create_followup_agent,
-)
-from agents_framework.agents.resume_writer_agent import (
-    ResumeWriterAgent,
-    create_resume_writer_agent,
-)
-from agents_framework.agents.analytics_agent import (
-    AnalyticsAgent,
-    create_analytics_agent,
-)
-from agents_framework.agents.orchestrator_agent import (
-    OrchestratorAgent,
-    create_orchestrator_agent,
-)
-
-__all__ = [
-    "EmailAnalystAgent",
-    "create_email_analyst_agent",
-    "FollowUpAgent",
-    "create_followup_agent",
-    "ResumeWriterAgent",
-    "create_resume_writer_agent",
-    "AnalyticsAgent",
-    "create_analytics_agent",
-    "OrchestratorAgent",
-    "create_orchestrator_agent",
-]

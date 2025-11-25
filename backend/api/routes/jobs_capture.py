@@ -227,28 +227,21 @@ async def capture_job_data(
             "captured_at": saved_application.created_at.isoformat() if saved_application.created_at else None
         }
 
-        # Broadcast real-time update via WebSocket
-        try:
-            await websocket_manager.broadcast({
-                "type": "NEW_APPLICATION",
-                "payload": saved_application.to_dict()
-            })
-            logger.info("📡 WebSocket broadcast sent for new job capture")
-        except Exception as ws_error:
-            logger.error(f"❌ WebSocket broadcast failed: {ws_error}")
-            # Don't fail the request if WebSocket fails
-        
-        # Update statistics and broadcast
+        # Broadcast consolidated real-time update via WebSocket
+        # Send both new application and updated statistics in a single broadcast
         try:
             stats = await db.get_statistics()
             await websocket_manager.broadcast({
-                "type": "STATISTICS_UPDATED", 
-                "payload": stats
+                "type": "NEW_APPLICATION",
+                "payload": {
+                    "application": saved_application.to_dict(),
+                    "statistics": stats
+                }
             })
-            logger.info("📊 Statistics updated and broadcast")
-        except Exception as stats_error:
-            logger.error(f"❌ Statistics update failed: {stats_error}")
-            # Don't fail the request if stats update fails
+            logger.info("📡 WebSocket broadcast sent for new job capture with statistics")
+        except Exception as ws_error:
+            logger.error(f"❌ WebSocket broadcast failed: {ws_error}")
+            # Don't fail the request if WebSocket fails
 
         return JobCaptureResponse(
             success=True,

@@ -25,8 +25,6 @@ class JobTrackerPopup {
   }
 
   async init() {
-    console.log('🚀 Job Tracker popup initializing...');
-
     // set up event listeners
     this.setupEventListeners();
 
@@ -47,12 +45,12 @@ class JobTrackerPopup {
       this.captureJob();
     })
 
-    // TODO: dashboard button
+    // Dashboard button
     this.elements.openDashboard.addEventListener('click', () => {
       chrome.tabs.create({url: this.backendUrl});
     });
 
-    // TODO: Listen for messages from content script
+    // Listen for messages from content script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       this.handleMessage(message, sender, sendResponse);
     });
@@ -128,7 +126,7 @@ class JobTrackerPopup {
     this.updateCaptureButton(true);
 
     try {
-      //TODO: prepate job data for backend
+      // Prepare job data for backend
       const jobData = {
         company: this.currentPageData.company || 'Unknown Company',
         position: this.currentPageData.position || 'Unknown Position',
@@ -141,8 +139,6 @@ class JobTrackerPopup {
         extraction_data: JSON.stringify(this.currentPageData)
       }
 
-      console.log('📤 Sending job data to backend:', jobData);
-
       // Send to backend
       const response = await fetch(`${this.backendUrl}/api/jobs/capture`, {
         method: 'POST',
@@ -154,7 +150,6 @@ class JobTrackerPopup {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Job captured successfully:', result);
         
         this.showMessage(`Successfully captured: ${jobData.company} - ${jobData.position}`, 'success');
         this.updateLastCapture(jobData);
@@ -185,7 +180,6 @@ class JobTrackerPopup {
 
     try {
       const url = `${this.backendUrl}/api/monitor/status`;
-      console.log('🔗 Attempting to connect to:', url);
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -197,7 +191,6 @@ class JobTrackerPopup {
       if (response.ok) {
         const data = await response.json();
         this.updateConnectionStatus('connected', 'Connected');
-        console.log('✅ Backend connection successful')
       }
     } catch (error) {
       console.error('❌ Backend connection failed:', error);
@@ -264,7 +257,6 @@ class JobTrackerPopup {
         }
 
       } catch (error) {
-        console.log('📄 Content script not available, analyzing URL...');
         // Fallback: analyze URL if content script not available
         this.analyzeUrlOnly(tab.url);
       }

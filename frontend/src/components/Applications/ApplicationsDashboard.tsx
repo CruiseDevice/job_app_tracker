@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, RotateCcw, AlertTriangle, X, FileText } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { JobApplicationCard } from './JobApplicationCard';
 import { ApplicationTimeline } from './ApplicationTimeline';
 import { Pagination } from '../common/Pagination';
@@ -65,7 +66,6 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
       
       if (data.success && data.duplicate_groups.length > 0) {
         setDuplicatesFound(data.duplicate_groups);
-        console.log(`Found ${data.duplicate_groups.length} potential duplicate groups`);
       }
     } catch (error) {
       console.error('Failed to check for duplicates:', error);
@@ -83,7 +83,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
       if (!response.ok) throw new Error('Failed to update status');
       
       const data = await response.json();
-      console.log(`✅ Status updated: ${data.message}`);
+      toast.success(data.message || 'Status updated successfully');
       
       // Call parent callback if provided
       if (onStatusUpdate) {
@@ -95,7 +95,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
       
     } catch (error) {
       console.error('Failed to update application status:', error);
-      alert('Failed to update application status. Please try again.');
+      toast.error('Failed to update application status');
     }
   };
 
@@ -113,14 +113,14 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
       if (!response.ok) throw new Error('Failed to delete application');
       
       const data = await response.json();
-      console.log(`✅ Application deleted: ${data.message}`);
+      toast.success(data.message || 'Application deleted successfully');
       
       // Reload applications to reflect changes
       loadApplications();
       
     } catch (error) {
       console.error('Failed to delete application:', error);
-      alert('Failed to delete application. Please try again.');
+      toast.error('Failed to delete application');
     }
   };
 
@@ -138,7 +138,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
       if (!response.ok) throw new Error('Failed to merge applications');
       
       const data = await response.json();
-      console.log(`✅ Merged applications: ${data.message}`);
+      toast.success(data.message || 'Applications merged successfully');
       
       // Refresh data
       loadApplications();
@@ -146,7 +146,7 @@ export const ApplicationsDashboard: React.FC<ApplicationsDashboardProps> = ({
       
     } catch (error) {
       console.error('Failed to merge applications:', error);
-      alert('Failed to merge duplicate applications. Please try again.');
+      toast.error('Failed to merge duplicate applications');
     }
   };
 

@@ -1,0 +1,15 @@
+{
+  "name": "job-application-tracker",
+  "version": "1.0.0",
+  "description": "Job Application Tracker with Backend and Frontend",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
+    "dev:backend": "cd backend && python main.py",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "cd frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+

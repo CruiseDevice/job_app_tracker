@@ -1,6 +1,31 @@
+import os
+from pathlib import Path
+
+# CRITICAL: Set CrewAI environment variables BEFORE any imports
+# This prevents permission errors with ~/.config/crewai
+_backend_dir = Path(__file__).parent
+_crewai_storage = _backend_dir / ".crewai"
+_crewai_storage.mkdir(exist_ok=True, mode=0o755)
+
+# Set ALL possible environment variables that CrewAI and dependencies might use
+os.environ["CREWAI_STORAGE_DIR"] = str(_crewai_storage)
+os.environ["XDG_CONFIG_HOME"] = str(_crewai_storage)
+os.environ["XDG_DATA_HOME"] = str(_crewai_storage / "data")
+os.environ["XDG_CACHE_HOME"] = str(_crewai_storage / "cache")
+os.environ["MEM0_DIR"] = str(_crewai_storage / "mem0")
+os.environ["OTEL_SDK_DISABLED"] = "true"
+
+# Prevent appdirs from using system config
+os.environ["APPDATA"] = str(_crewai_storage)
+
+# Create necessary directories
+(_crewai_storage / "mem0").mkdir(exist_ok=True, mode=0o755)
+(_crewai_storage / "data").mkdir(exist_ok=True, mode=0o755)
+(_crewai_storage / "cache").mkdir(exist_ok=True, mode=0o755)
+
+# NOW import everything else
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager

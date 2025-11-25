@@ -69,7 +69,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         break;
 
       default:
-        console.log('Unknown WebSocket message type:', message.type);
+        // Unknown message type - ignore silently
+        break;
     }
   }, [dispatch]);
 

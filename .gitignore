@@ -213,3 +213,10 @@ database.db
 
 # ChromaDB vector database
 backend/data/chroma/
+
+# CrewAI storage directory
+backend/.crewai/
+
+# Node modules (root level for concurrently)
+/node_modules/
+/package-lock.json

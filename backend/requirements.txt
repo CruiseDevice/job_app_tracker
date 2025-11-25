@@ -21,3 +21,12 @@ tiktoken>=0.5.2
 
 # Optional: LangSmith for debugging and monitoring
 langsmith>=0.0.77
+
+# CrewAI for multi-agent orchestration
+crewai>=0.11.0
+crewai-tools>=0.2.0
+
+# Real Job Scraping
+google-search-results  # SerpAPI for real job data
+requests
+beautifulsoup4  # Backup scraping option

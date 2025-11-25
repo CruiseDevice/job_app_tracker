@@ -21,16 +21,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     {name: 'Settings', href:'/settings', icon: Settings},
   ];
 
-  const agentNavigation = [
-    {name: 'Email Analyst', href:'/agents/email-analyst', icon: '📧'},
-    {name: 'Application Manager', href:'/agents/application-manager', icon: '📊'},
-    {name: 'Follow-up Agent', href:'/agents/followup', icon: '⏰'},
-    {name: 'Job Hunter', href:'/agents/job-hunter', icon: '🔍'},
-    {name: 'Resume Writer', href:'/agents/resume-writer', icon: '📝'},
-    {name: 'Interview Prep', href:'/agents/interview-prep', icon: '🎯'},
-    {name: 'Analytics', href:'/agents/analytics', icon: '📈'},
-    {name: 'Orchestrator', href:'/agents/orchestrator', icon: '🎭'},
-  ];
+  const agentNavigation: Array<{name: string, href: string, icon: string}> = [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -85,45 +76,47 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </ul>
 
             {/* Agents Section */}
-            <div className="mt-6">
-              <button
-                onClick={() => setAgentsExpanded(!agentsExpanded)}
-                className="flex items-center justify-between w-full px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
-              >
-                <div className="flex items-center">
-                  <Bot className="w-5 h-5 mr-3" />
-                  AI Agents
-                </div>
-                {agentsExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
+            {agentNavigation.length > 0 && (
+              <div className="mt-6">
+                <button
+                  onClick={() => setAgentsExpanded(!agentsExpanded)}
+                  className="flex items-center justify-between w-full px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                >
+                  <div className="flex items-center">
+                    <Bot className="w-5 h-5 mr-3" />
+                    AI Agents
+                  </div>
+                  {agentsExpanded ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+
+                {agentsExpanded && (
+                  <ul className="mt-2 space-y-1 ml-2">
+                    {agentNavigation.map((agent) => {
+                      const isActive = location.pathname === agent.href;
+
+                      return (
+                        <li key={agent.name}>
+                          <Link
+                            to={agent.href}
+                            className={clsx('flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors', {
+                              'bg-blue-100 text-blue-700': isActive,
+                              'text-gray-600 hover:text-gray-900 hover:bg-gray-50': !isActive,
+                            })}
+                          >
+                            <span className="mr-3">{agent.icon}</span>
+                            {agent.name}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
-              </button>
-
-              {agentsExpanded && (
-                <ul className="mt-2 space-y-1 ml-2">
-                  {agentNavigation.map((agent) => {
-                    const isActive = location.pathname === agent.href;
-
-                    return (
-                      <li key={agent.name}>
-                        <Link
-                          to={agent.href}
-                          className={clsx('flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors', {
-                            'bg-blue-100 text-blue-700': isActive,
-                            'text-gray-600 hover:text-gray-900 hover:bg-gray-50': !isActive,
-                          })}
-                        >
-                          <span className="mr-3">{agent.icon}</span>
-                          {agent.name}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </nav>
         {/* main content */}

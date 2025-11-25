@@ -1,11 +1,13 @@
 // FILE: frontend/src/components/Settings/Settings.tsx
 
 import React, { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
 import { setTheme, toggleNotifications, toggleAutoRefresh } from '../../store/slices/settingsSlice';
 import { Save, Bell, RefreshCw, Palette, Mail, Database, Shield } from 'lucide-react';
 import { WebSocketService } from '../../services/websocket';
+import { settingsApi } from '../../services/settings';
 
 // Type definitions for settings
 type SettingToggle = {
@@ -44,14 +46,24 @@ const Settings: React.FC = () => {
   const dispatch = useAppDispatch();
   const settings = useAppSelector(state => state.settings);
   const [isSaving, setIsSaving] = useState(false);
+  const [emailCheckInterval, setEmailCheckInterval] = useState(5);
 
   const handleSave = async () => {
     setIsSaving(true);
-    // TODO: Save settings to backend
-    setTimeout(() => {
+    try {
+      await settingsApi.updateSettings({
+        theme: settings.theme,
+        notifications: settings.notifications,
+        autoRefresh: settings.autoRefresh,
+        email_check_interval: emailCheckInterval,
+      });
+      toast.success('Settings saved successfully');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
+    } finally {
       setIsSaving(false);
-      // TODO: Show success toast
-    }, 1000);
+    }
   };
 
   const handleNotificationToggle = async () => {
@@ -63,8 +75,7 @@ const Settings: React.FC = () => {
           dispatch(toggleNotifications());
         } else {
           // Permission denied, show user feedback
-          console.log('Notification permission denied by user');
-          // You could add a toast notification here
+          toast.error('Notification permission denied');
         }
       } catch (error) {
         console.error('Error requesting notification permission:', error);
@@ -127,8 +138,8 @@ const Settings: React.FC = () => {
         {
           label: 'Check interval (minutes)',
           type: 'number' as const,
-          value: 5,
-          onChange: (value: number) => console.log('Update interval:', value)
+          value: emailCheckInterval,
+          onChange: (value: number) => setEmailCheckInterval(value)
         }
       ]
     },
@@ -140,13 +151,17 @@ const Settings: React.FC = () => {
           label: 'Export data',
           type: 'button' as const,
           value: 'Export',
-          onClick: () => console.log('Export data')
+          onClick: () => {
+            toast('Export functionality coming soon', { icon: 'ℹ️' });
+          }
         },
         {
           label: 'Import data',
           type: 'button' as const,
           value: 'Import',
-          onClick: () => console.log('Import data')
+          onClick: () => {
+            toast('Import functionality coming soon', { icon: 'ℹ️' });
+          }
         }
       ]
     },
@@ -159,7 +174,11 @@ const Settings: React.FC = () => {
           type: 'button' as const,
           value: 'Clear Data',
           danger: true,
-          onClick: () => console.log('Clear all data')
+          onClick: () => {
+            if (window.confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+              toast('Clear data functionality coming soon', { icon: 'ℹ️' });
+            }
+          }
         }
       ]
     }

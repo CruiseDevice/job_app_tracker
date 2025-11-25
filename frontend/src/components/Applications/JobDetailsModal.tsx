@@ -85,15 +85,15 @@ const mockEmailMatchingAPI: EmailJobMatchingAPI = {
   ],
 
   createManualLink: async (emailId: string, jobId: number) => {
-    console.log(`Creating manual link: ${emailId} → ${jobId}`);
+    // TODO: Implement API call when endpoint is available
   },
 
   updateLink: async (linkId: number, updates: any) => {
-    console.log(`Updating link ${linkId}:`, updates);
+    // TODO: Implement API call when endpoint is available
   },
 
   deleteLink: async (linkId: number) => {
-    console.log(`Deleting link ${linkId}`);
+    // TODO: Implement API call when endpoint is available
   }
 };
 

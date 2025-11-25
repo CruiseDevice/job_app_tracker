@@ -6,7 +6,6 @@ An intelligent job application tracking system that automatically monitors your 
 
 - 🤖 **AI-Powered Email Analysis** - Automatically detects and extracts job application details from emails
 - 📧 **Email Monitoring** - Real-time IMAP monitoring of your inbox for job-related emails
-- 📊 **Statistics Dashboard** - Comprehensive analytics on your job application activity
 - 🔄 **Real-time Updates** - WebSocket integration for live data synchronization
 - 🎯 **Application Management** - Track applications with status updates and filtering
 - ⚡ **Quick Actions** - Easy controls for monitoring and data management
@@ -72,6 +71,24 @@ An intelligent job application tracking system that automatically monitors your 
 
 ### Running the Application
 
+#### Option 1: Start Both Servers at Once (Recommended)
+
+**Using npm (requires one-time setup):**
+```bash
+# First time only: Install concurrently
+npm install
+
+# Start both backend and frontend together
+npm run dev
+```
+
+**Using the shell script (Mac/Linux):**
+```bash
+./start.sh
+```
+
+#### Option 2: Start Servers Separately
+
 1. **Start Backend** (Terminal 1)
    ```bash
    cd backend
@@ -84,10 +101,11 @@ An intelligent job application tracking system that automatically monitors your 
    npm run dev
    ```
 
-3. **Access Application**
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:8000
-   - API Docs: http://localhost:8000/docs
+#### Access the Application
+
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
 ## How It Works
 
@@ -100,7 +118,7 @@ An intelligent job application tracking system that automatically monitors your 
    - Contact information
 3. **Data Storage** - Extracted information is stored in SQLite database
 4. **Real-time Updates** - WebSocket connections keep the frontend synchronized with new data
-5. **Dashboard Analytics** - View comprehensive statistics and manage applications through the web interface
+5. **Application Management** - Manage applications through the web interface with real-time updates
 
 ## Project Structure
 
